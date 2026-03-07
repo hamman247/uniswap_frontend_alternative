@@ -1,0 +1,410 @@
+/**
+ * SwapCard Component — The main swap interface
+ */
+import { ICONS } from './icons.js';
+import { TOKENS, getTokenBySymbol, renderTokenIcon } from '../config/tokens.js';
+import { feeManager } from '../fees/feeManager.js';
+import { findOptimalRoute, generateDemoRoute } from '../routing/optimizer.js';
+import { discoverPools } from '../routing/poolDiscovery.js';
+import { getCachedBalance } from '../utils/balances.js';
+import { estimateGasCostUsd } from '../utils/gasOracle.js';
+
+export class SwapCard {
+  constructor({ onSwap, onSelectToken, onOpenSettings, routeVisualizer, getProvider }) {
+    this.onSwap = onSwap;
+    this.onSelectToken = onSelectToken;
+    this.onOpenSettings = onOpenSettings;
+    this.routeVisualizer = routeVisualizer;
+    this.getProvider = getProvider; // () => provider | null
+
+    this.tokenIn = getTokenBySymbol('ETH');
+    this.tokenOut = getTokenBySymbol('WISE');
+    this.amountIn = '';
+    this.amountOut = '';
+    this.currentRoute = null;
+    this.isLoading = false;
+    this.debounceTimer = null;
+
+    this.element = null;
+  }
+
+  render() {
+    const card = document.createElement('div');
+    card.className = 'swap-card animate-fade-in-up';
+    card.id = 'swap-card';
+
+    card.innerHTML = `
+      <div class="swap-card-header">
+        <span class="swap-card-title">Swap</span>
+        <button class="swap-card-settings-btn" id="swap-settings-btn" title="Transaction Settings">
+          ${ICONS.settings}
+        </button>
+      </div>
+
+      <!-- Token In -->
+      <div class="token-input-wrapper" id="input-wrapper-in">
+        <div class="token-input-label">
+          <span class="token-input-label-text">You Pay</span>
+          <span class="token-input-balance-group">
+            <span id="balance-in">Balance: —</span>
+            <button class="max-btn" id="max-btn">MAX</button>
+          </span>
+        </div>
+        <div class="token-input-row">
+          <input
+            type="text"
+            inputmode="decimal"
+            class="token-amount-input"
+            id="amount-input-in"
+            placeholder="0"
+            autocomplete="off"
+          />
+          <button class="token-selector-btn" id="token-selector-in">
+            ${this._renderTokenButton(this.tokenIn)}
+          </button>
+        </div>
+        <div class="token-usd-value" id="usd-value-in"></div>
+      </div>
+
+      <!-- Swap Direction -->
+      <div class="swap-direction-container">
+        <button class="swap-direction-btn" id="swap-direction-btn">
+          ${ICONS.swap}
+        </button>
+      </div>
+
+      <!-- Token Out -->
+      <div class="token-input-wrapper" id="input-wrapper-out">
+        <div class="token-input-label">
+          <span class="token-input-label-text">You Receive</span>
+          <span class="token-input-balance" id="balance-out">Balance: —</span>
+        </div>
+        <div class="token-input-row">
+          <input
+            type="text"
+            inputmode="decimal"
+            class="token-amount-input"
+            id="amount-input-out"
+            placeholder="0"
+            readonly
+          />
+          <button class="token-selector-btn" id="token-selector-out">
+            ${this._renderTokenButton(this.tokenOut)}
+          </button>
+        </div>
+        <div class="token-usd-value" id="usd-value-out"></div>
+      </div>
+
+      <!-- Info Section -->
+      <div class="swap-info" id="swap-info" style="display: none;">
+        <div class="swap-info-row">
+          <span class="swap-info-label">
+            Rate
+          </span>
+          <span class="swap-info-value" id="swap-rate">—</span>
+        </div>
+        <div class="swap-info-divider"></div>
+        <div class="swap-info-row">
+          <span class="swap-info-label">
+            Interface Fee
+            <span class="info-icon tooltip" data-tooltip="No interface fee — 0 bps">?</span>
+          </span>
+          <span class="swap-info-value" id="swap-fee">—</span>
+        </div>
+        <div class="swap-info-row">
+          <span class="swap-info-label">Price Impact</span>
+          <span class="swap-info-value" id="swap-impact">—</span>
+        </div>
+        <div class="swap-info-row">
+          <span class="swap-info-label">Min. Received</span>
+          <span class="swap-info-value" id="swap-min-received">—</span>
+        </div>
+        <div class="swap-info-row">
+          <span class="swap-info-label">Network Cost</span>
+          <span class="swap-info-value" id="swap-gas">—</span>
+        </div>
+      </div>
+
+      <!-- Submit Button -->
+      <button class="swap-submit-btn disabled" id="swap-submit-btn">
+        Enter an amount
+      </button>
+    `;
+
+    this.element = card;
+    this._bindEvents();
+    return card;
+  }
+
+  _renderTokenButton(token) {
+    if (!token) {
+      return `
+        <span class="token-symbol-text" style="color: white;">Select token</span>
+        <svg class="token-selector-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M6 9l6 6 6-6"/>
+        </svg>
+      `;
+    }
+    return `
+      ${renderTokenIcon(token, 28)}
+      <span class="token-symbol-text">${token.symbol}</span>
+      <svg class="token-selector-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M6 9l6 6 6-6"/>
+      </svg>
+    `;
+  }
+
+  _bindEvents() {
+    // Amount input with debounce
+    this.element.querySelector('#amount-input-in').addEventListener('input', (e) => {
+      // Allow only valid number input
+      let value = e.target.value.replace(/[^0-9.]/g, '');
+      // Prevent multiple dots
+      const parts = value.split('.');
+      if (parts.length > 2) value = parts[0] + '.' + parts.slice(1).join('');
+      e.target.value = value;
+      this.amountIn = value;
+
+      // Debounced route calculation
+      clearTimeout(this.debounceTimer);
+      if (value && parseFloat(value) > 0) {
+        this.debounceTimer = setTimeout(() => this._calculateRoute(), 400);
+      } else {
+        this._clearOutput();
+      }
+    });
+
+    // Settings
+    this.element.querySelector('#swap-settings-btn').addEventListener('click', () => {
+      if (this.onOpenSettings) this.onOpenSettings();
+    });
+
+    // Swap direction
+    this.element.querySelector('#swap-direction-btn').addEventListener('click', () => {
+      this._swapTokens();
+    });
+
+    // Token selectors
+    this.element.querySelector('#token-selector-in').addEventListener('click', () => {
+      if (this.onSelectToken) {
+        this.onSelectToken('in', this.tokenOut?.address);
+      }
+    });
+
+    this.element.querySelector('#token-selector-out').addEventListener('click', () => {
+      if (this.onSelectToken) {
+        this.onSelectToken('out', this.tokenIn?.address);
+      }
+    });
+
+    // Max button
+    this.element.querySelector('#max-btn').addEventListener('click', () => {
+      this._setMaxAmount();
+    });
+
+    // Submit
+    this.element.querySelector('#swap-submit-btn').addEventListener('click', () => {
+      if (this.currentRoute && this.onSwap) {
+        this.onSwap(this.currentRoute, this.tokenIn, this.tokenOut);
+      }
+    });
+  }
+
+  _setMaxAmount() {
+    if (!this.tokenIn) return;
+    const bal = getCachedBalance(this.tokenIn.address);
+    if (!bal || bal.raw === 0n) return;
+
+    // For native ETH, leave a small amount for gas
+    let raw = bal.raw;
+    if (this.tokenIn.isNative) {
+      const gasBuffer = BigInt(1e15); // 0.001 ETH for gas
+      raw = raw > gasBuffer ? raw - gasBuffer : 0n;
+    }
+
+    const amount = Number(raw) / (10 ** this.tokenIn.decimals);
+    const display = amount < 1 ? amount.toFixed(6) : amount.toFixed(this.tokenIn.decimals <= 6 ? 2 : 6);
+
+    this.amountIn = display;
+    this.element.querySelector('#amount-input-in').value = display;
+
+    clearTimeout(this.debounceTimer);
+    if (amount > 0) {
+      this._calculateRoute();
+    }
+  }
+
+  _swapTokens() {
+    const tempToken = this.tokenIn;
+    this.tokenIn = this.tokenOut;
+    this.tokenOut = tempToken;
+
+    // Update UI
+    this.element.querySelector('#token-selector-in').innerHTML = this._renderTokenButton(this.tokenIn);
+    this.element.querySelector('#token-selector-out').innerHTML = this._renderTokenButton(this.tokenOut);
+    this.updateBalances();
+
+    // Recalculate if there's an amount
+    if (this.amountIn && parseFloat(this.amountIn) > 0) {
+      this._calculateRoute();
+    } else {
+      this._clearOutput();
+    }
+  }
+
+  setToken(side, token) {
+    if (side === 'in') {
+      this.tokenIn = token;
+      this.element.querySelector('#token-selector-in').innerHTML = this._renderTokenButton(token);
+    } else {
+      this.tokenOut = token;
+      this.element.querySelector('#token-selector-out').innerHTML = this._renderTokenButton(token);
+    }
+
+    this.updateBalances();
+
+    // Recalculate
+    if (this.amountIn && parseFloat(this.amountIn) > 0) {
+      this._calculateRoute();
+    }
+  }
+
+  /**
+   * Update displayed balances from the cache
+   */
+  updateBalances() {
+    if (this.tokenIn) {
+      const balIn = getCachedBalance(this.tokenIn.address);
+      const el = this.element.querySelector('#balance-in');
+      el.textContent = balIn ? `Balance: ${balIn.formatted}` : 'Balance: —';
+    }
+    if (this.tokenOut) {
+      const balOut = getCachedBalance(this.tokenOut.address);
+      const el = this.element.querySelector('#balance-out');
+      el.textContent = balOut ? `Balance: ${balOut.formatted}` : 'Balance: —';
+    }
+  }
+
+  async _calculateRoute() {
+    if (!this.tokenIn || !this.tokenOut || !this.amountIn || parseFloat(this.amountIn) <= 0) {
+      this._clearOutput();
+      return;
+    }
+
+    this.isLoading = true;
+    this._updateSubmitButton('loading', 'Finding best route...');
+    if (this.routeVisualizer) this.routeVisualizer.showLoading();
+
+    try {
+      const amountInNum = parseFloat(this.amountIn);
+      const rawAmountIn = BigInt(Math.floor(amountInNum * (10 ** this.tokenIn.decimals)));
+
+      const provider = this.getProvider ? this.getProvider() : null;
+      let route;
+
+      if (provider) {
+        // == REAL ROUTING: discover pools on-chain, then optimize ==
+        this._updateSubmitButton('loading', 'Discovering pools...');
+        const pools = await discoverPools(provider, this.tokenIn, this.tokenOut);
+
+        if (pools.length === 0) {
+          // No on-chain pools found — fall back to demo
+          console.warn('No pools found on-chain, using simulated route');
+          route = generateDemoRoute(this.tokenIn, this.tokenOut, rawAmountIn, this.tokenIn.decimals, this.tokenOut.decimals);
+        } else {
+          this._updateSubmitButton('loading', `Optimizing across ${pools.length} pools...`);
+          route = await findOptimalRoute(provider, pools, rawAmountIn, this.tokenIn.decimals, this.tokenOut.decimals);
+        }
+      } else {
+        // == DEMO MODE: no wallet connected ==
+        route = generateDemoRoute(this.tokenIn, this.tokenOut, rawAmountIn, this.tokenIn.decimals, this.tokenOut.decimals);
+      }
+
+      this.currentRoute = route;
+
+      if (!route || route.totalAmountOut === 0n) {
+        this._updateSubmitButton('disabled', 'Insufficient liquidity');
+        this._clearOutput();
+        return;
+      }
+
+      // Update output amount
+      const amountOutFloat = Number(route.totalAmountOut) / (10 ** this.tokenOut.decimals);
+      this.amountOut = amountOutFloat.toFixed(this.tokenOut.decimals <= 6 ? 2 : 6);
+      this.element.querySelector('#amount-input-out').value = this._formatAmountDisplay(amountOutFloat);
+
+      // Update info section
+      this._updateInfoSection(route, amountInNum, amountOutFloat);
+
+      // Update route visualizer
+      if (this.routeVisualizer) this.routeVisualizer.update(route);
+
+      // Update submit button
+      const modeLabel = provider ? '' : ' (simulated)';
+      this._updateSubmitButton('ready', `Swap${modeLabel}`);
+    } catch (error) {
+      console.error('Route calculation error:', error);
+      this._updateSubmitButton('disabled', 'Error calculating route');
+    }
+
+    this.isLoading = false;
+  }
+
+  _updateInfoSection(route, amountInNum, amountOutNum) {
+    const infoSection = this.element.querySelector('#swap-info');
+    infoSection.style.display = 'flex';
+
+    // Rate
+    const rate = amountOutNum / amountInNum;
+    this.element.querySelector('#swap-rate').textContent =
+      `1 ${this.tokenIn.symbol} = ${this._formatAmountDisplay(rate)} ${this.tokenOut.symbol}`;
+
+    // Fee
+    const { feeHuman } = feeManager.calculateFeeHuman(amountInNum, this.tokenIn.decimals);
+    this.element.querySelector('#swap-fee').textContent =
+      `${this._formatAmountDisplay(feeHuman)} ${this.tokenIn.symbol} (0.05%)`;
+
+    // Price impact
+    const impactEl = this.element.querySelector('#swap-impact');
+    const impact = route.priceImpact;
+    impactEl.textContent = `${impact.toFixed(2)}%`;
+    impactEl.className = 'swap-info-value' + (impact < 1 ? ' positive' : impact > 5 ? ' danger' : '');
+
+    // Min received (with 0.5% default slippage)
+    const slippage = 0.005;
+    const minReceived = amountOutNum * (1 - slippage);
+    this.element.querySelector('#swap-min-received').textContent =
+      `${this._formatAmountDisplay(minReceived)} ${this.tokenOut.symbol}`;
+
+    // Gas — use live gas price
+    const provider = this.getProvider ? this.getProvider() : null;
+    estimateGasCostUsd(provider, route.totalGas).then(({ costUsd, gasPriceGwei }) => {
+      const gasEl = this.element.querySelector('#swap-gas');
+      gasEl.textContent = `~$${costUsd.toFixed(2)} (${gasPriceGwei.toFixed(1)} gwei)`;
+    });
+  }
+
+  _formatAmountDisplay(num) {
+    if (num === 0) return '0';
+    if (num < 0.001) return num.toExponential(2);
+    if (num < 1) return num.toFixed(6);
+    if (num < 10) return num.toFixed(4);
+    if (num < 10000) return num.toFixed(2);
+    return num.toLocaleString('en-US', { maximumFractionDigits: 2 });
+  }
+
+  _updateSubmitButton(state, text) {
+    const btn = this.element.querySelector('#swap-submit-btn');
+    btn.className = 'swap-submit-btn ' + state;
+    btn.textContent = text;
+  }
+
+  _clearOutput() {
+    this.amountOut = '';
+    this.currentRoute = null;
+    this.element.querySelector('#amount-input-out').value = '';
+    this.element.querySelector('#swap-info').style.display = 'none';
+    this._updateSubmitButton('disabled', this.amountIn ? 'Enter an amount' : 'Enter an amount');
+    if (this.routeVisualizer) this.routeVisualizer.hide();
+  }
+}
