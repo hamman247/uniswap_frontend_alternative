@@ -30,6 +30,10 @@ const UR_COMMANDS = {
     V4_SWAP: 0x10,
 };
 
+// Universal Router special address constants
+const MSG_SENDER = '0x0000000000000000000000000000000000000001';
+const ADDRESS_THIS = '0x0000000000000000000000000000000000000002';
+
 // ─── V4 swap action IDs (from @uniswap/v4-sdk Actions enum) ───
 const V4_ACTIONS = {
     SWAP_EXACT_IN_SINGLE: 0x06,
@@ -135,7 +139,7 @@ export async function executeRoute(signer, routeResult, tokenIn, tokenOut, slipp
     const effectiveTokenIn = tokenIn.isNative ? wethAddr : tokenIn.address;
     const effectiveTokenOut = tokenOut.isNative ? wethAddr : tokenOut.address;
 
-    // ─── Try Universal Router batching first ───
+    // ─── Use Universal Router for batched transactions ───
     const universalRouterAddr = contracts.v4UniversalRouter;
     if (universalRouterAddr) {
         return [await executeBatchedViaUniversalRouter(
@@ -197,12 +201,14 @@ async function executeBatchedViaUniversalRouter(
             commands.push(UR_COMMANDS.WRAP_ETH);
             inputs.push(abiCoder.encode(
                 ['address', 'uint256'],
-                [universalRouterAddr, v2v3Amount]
+                [ADDRESS_THIS, v2v3Amount]
             ));
         }
     } else {
-        // ERC-20 input: ensure approval for the Universal Router
-        await ensureApproval(signer, tokenIn.address, universalRouterAddr, routeResult.totalAmountIn, gasOverrides);
+        // ERC-20 input: Universal Router V2 uses Permit2 for token pulls.
+        // Approve the Permit2 contract (same address on all chains).
+        const PERMIT2 = '0x000000000022D473030F116dDEE9F6B43aC78BA3';
+        await ensureApproval(signer, tokenIn.address, PERMIT2, routeResult.totalAmountIn, gasOverrides);
     }
 
     // Encode each route leg as a Universal Router command
@@ -213,7 +219,7 @@ async function executeBatchedViaUniversalRouter(
             : route.pool.version;
 
         const payerIsUser = !tokenIn.isNative;
-        const swapRecipient = tokenOut.isNative ? universalRouterAddr : recipient;
+        const swapRecipient = tokenOut.isNative ? ADDRESS_THIS : recipient;
 
         if (version === 'V4') {
             // V4 swap via V4_SWAP command — uses pool's actual currencies from PoolKey
@@ -247,30 +253,34 @@ async function executeBatchedViaUniversalRouter(
         commands.push(UR_COMMANDS.UNWRAP_WETH);
         inputs.push(abiCoder.encode(
             ['address', 'uint256'],
-            [recipient, totalMinOut]
+            [MSG_SENDER, totalMinOut]
         ));
     }
 
     // Build the commands bytes
     const commandBytes = '0x' + commands.map(c => c.toString(16).padStart(2, '0')).join('');
 
-    console.log(`Executing ${commands.length} commands via Universal Router in a single transaction`);
+    // ─── Tracking: encode "OW" tag (0x4F57) in the lower 16 bits of deadline ───
+    // The deadline just needs to be in the future. We round it up to the
+    // nearest 0x10000 (65,536 seconds ≈ 18 hours) and OR with our tag.
+    // Max deadline increase: ~18 hours. Scanner checks: deadline & 0xFFFF === 0x4F57.
+    const taggedDeadline = (Math.ceil(deadline / 0x10000) * 0x10000) | 0x4F57;
 
-    // Encode the execute() calldata manually so we can append the tracking tag
+    console.log(`Executing ${commands.length} commands via Universal Router:`);
+    console.log('  Commands:', commandBytes);
+    console.log('  Deadline:', deadline);
+    console.log('  Value:', totalEthValue.toString());
+    console.log('  Router:', universalRouterAddr);
+
+    // Encode the execute() calldata
     const iface = new ethers.Interface([
         'function execute(bytes calldata commands, bytes[] calldata inputs, uint256 deadline) payable'
     ]);
-    const calldata = iface.encodeFunctionData('execute', [commandBytes, inputs, deadline]);
-
-    // Append OWLSWAP tracking tag (ASCII "OWLSWAP" = 0x4f574c53574150)
-    // The EVM ignores trailing bytes beyond the ABI-decoded params,
-    // so this tag is invisible to the smart contract but visible on-chain.
-    const TRACKING_TAG = '4f574c53574150';
-    const taggedCalldata = calldata + TRACKING_TAG;
+    const calldata = iface.encodeFunctionData('execute', [commandBytes, inputs, taggedDeadline]);
 
     return signer.sendTransaction({
         to: universalRouterAddr,
-        data: taggedCalldata,
+        data: calldata,
         value: totalEthValue,
         ...gasOverrides,
     });

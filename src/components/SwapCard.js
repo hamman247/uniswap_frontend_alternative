@@ -223,15 +223,25 @@ export class SwapCard {
     });
   }
 
-  _setMaxAmount() {
+  async _setMaxAmount() {
     if (!this.tokenIn) return;
     const bal = getCachedBalance(this.tokenIn.address);
     if (!bal || bal.raw === 0n) return;
 
-    // For native ETH, leave a small amount for gas
+    // For native tokens, leave enough for gas (chain-dependent)
     let raw = bal.raw;
     if (this.tokenIn.isNative) {
-      const gasBuffer = BigInt(1e15); // 0.001 ETH for gas
+      const { getCurrentChainId } = await import('../config/contracts.js');
+      const chainId = getCurrentChainId();
+      // Chain-specific gas buffers in native token units
+      const gasBuffers = {
+        1: BigInt(5e15),      // 0.005 ETH
+        137: BigInt(5e17),    // 0.5 POL
+        56: BigInt(5e15),     // 0.005 BNB
+        43114: BigInt(5e16),  // 0.05 AVAX
+        369: BigInt(5e17),    // 0.5 PLS
+      };
+      const gasBuffer = gasBuffers[chainId] || BigInt(5e15);
       raw = raw > gasBuffer ? raw - gasBuffer : 0n;
     }
 
@@ -257,12 +267,8 @@ export class SwapCard {
     this.element.querySelector('#token-selector-out').innerHTML = this._renderTokenButton(this.tokenOut);
     this.updateBalances();
 
-    // Recalculate if there's an amount
-    if (this.amountIn && parseFloat(this.amountIn) > 0) {
-      this._calculateRoute();
-    } else {
-      this._clearOutput();
-    }
+    // Clear fields — user must re-enter amount
+    this.clearFields();
   }
 
   setToken(side, token) {
@@ -276,10 +282,8 @@ export class SwapCard {
 
     this.updateBalances();
 
-    // Recalculate
-    if (this.amountIn && parseFloat(this.amountIn) > 0) {
-      this._calculateRoute();
-    }
+    // Clear fields — user must re-enter amount
+    this.clearFields();
   }
 
   /**
@@ -416,7 +420,7 @@ export class SwapCard {
       }
     } catch (error) {
       console.error('Route calculation error:', error);
-      this._updateSubmitButton('disabled', 'Error calculating route');
+      this._updateSubmitButton('disabled', t('noRouteFound'));
     }
 
     this.isLoading = false;

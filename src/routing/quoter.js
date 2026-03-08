@@ -16,25 +16,30 @@ const Q192 = Q96 * Q96;
  * @returns {Promise<{ amountOut: bigint, priceImpact: number, gasEstimate: number }>}
  */
 export async function getQuote(provider, pool, amountIn, decimalsIn, decimalsOut) {
-    // Multi-hop: quote leg1, then use output as input for leg2
-    if (pool.isMultiHop) {
-        return getMultiHopQuote(provider, pool, amountIn);
-    }
+    try {
+        // Multi-hop: quote leg1, then use output as input for leg2
+        if (pool.isMultiHop) {
+            return await getMultiHopQuote(provider, pool, amountIn);
+        }
 
-    // API-discovered pools: use the Uniswap Routing API for quoting
-    if (pool.useApiQuote) {
-        return getApiQuote(pool, amountIn);
-    }
+        // API-discovered pools: use the Uniswap Routing API for quoting
+        if (pool.useApiQuote) {
+            return await getApiQuote(pool, amountIn);
+        }
 
-    switch (pool.version) {
-        case 'V2':
-            return getV2Quote(pool, amountIn);
-        case 'V3':
-            return getV3Quote(provider, pool, amountIn);
-        case 'V4':
-            return getV4Quote(provider, pool, amountIn);
-        default:
-            throw new Error(`Unknown pool version: ${pool.version}`);
+        switch (pool.version) {
+            case 'V2':
+                return getV2Quote(pool, amountIn);
+            case 'V3':
+                return await getV3Quote(provider, pool, amountIn);
+            case 'V4':
+                return await getV4Quote(provider, pool, amountIn);
+            default:
+                throw new Error(`Unknown pool version: ${pool.version}`);
+        }
+    } catch (e) {
+        console.warn(`Quote failed for ${pool.version} pool ${pool.address}:`, e.message);
+        return { amountOut: 0n, priceImpact: 100, gasEstimate: pool.gasEstimate || 200000 };
     }
 }
 
@@ -158,13 +163,13 @@ function getV2Quote(pool, amountIn) {
  * Falls back to sqrtPriceX96 math if quoter fails
  */
 async function getV3Quote(provider, pool, amountIn) {
-    try {
-        const quoterAddr = UNISWAP_V3.quoterV2;
-        if (!quoterAddr) {
-            // No quoter deployed on this chain — use math fallback
-            return getV3QuoteMath(pool, amountIn);
-        }
+    const quoterAddr = UNISWAP_V3.quoterV2;
+    if (!quoterAddr) {
+        // No quoter deployed on this chain — use math fallback
+        return getV3QuoteMath(pool, amountIn);
+    }
 
+    try {
         const { ethers } = await import('ethers');
 
         const quoter = new ethers.Contract(
@@ -195,6 +200,7 @@ async function getV3Quote(provider, pool, amountIn) {
         };
     } catch (e) {
         // Fallback to math-based quote using sqrtPriceX96
+        console.warn(`V3 on-chain quote failed for pool ${pool.address}, using math fallback`);
         return getV3QuoteMath(pool, amountIn);
     }
 }

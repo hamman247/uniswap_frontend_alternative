@@ -208,19 +208,24 @@ async function discoverV2Pools(provider, tokenIn, tokenOut) {
             ]);
 
             const isToken0In = tokenIn.toLowerCase() === token0.toLowerCase();
+            const reserveIn = isToken0In ? reserves[0] : reserves[1];
+            const reserveOut = isToken0In ? reserves[1] : reserves[0];
 
-            pools.push({
-                version: 'V2',
-                address: pairAddress,
-                tokenIn,
-                tokenOut,
-                fee: 3000, // 0.3% standard V2 fee
-                feeLabel: '0.30%',
-                reserveIn: isToken0In ? reserves[0] : reserves[1],
-                reserveOut: isToken0In ? reserves[1] : reserves[0],
-                liquidity: reserves[0] + reserves[1],
-                gasEstimate: 150000,
-            });
+            // Skip pools with negligible liquidity (prevents failed swaps on low-liquidity chains)
+            if (reserveIn > 1000n && reserveOut > 1000n) {
+                pools.push({
+                    version: 'V2',
+                    address: pairAddress,
+                    tokenIn,
+                    tokenOut,
+                    fee: 3000, // 0.3% standard V2 fee
+                    feeLabel: '0.30%',
+                    reserveIn,
+                    reserveOut,
+                    liquidity: reserves[0] + reserves[1],
+                    gasEstimate: 150000,
+                });
+            }
         }
     } catch (e) {
         console.warn('V2 pool discovery failed:', e.message);

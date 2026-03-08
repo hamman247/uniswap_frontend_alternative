@@ -300,7 +300,14 @@ class App {
             this._showNotification('success', `${t('swapSubmitted')} ${txResults.length} ${t('txCount')}`);
         } catch (error) {
             console.error('Swap execution error:', error);
-            const msg = error.reason || error.message || 'Transaction failed';
+            let msg = 'Transaction failed';
+            if (error.code === 'ACTION_REJECTED' || error.code === 4001) {
+                msg = 'Transaction rejected by user';
+            } else if (error.reason && !error.reason.includes('require') && error.reason.length < 100) {
+                msg = error.reason;
+            } else if (error.message?.includes('insufficient funds')) {
+                msg = 'Insufficient funds for gas';
+            }
             this._showNotification('error', `❌ ${msg}`);
         }
     }

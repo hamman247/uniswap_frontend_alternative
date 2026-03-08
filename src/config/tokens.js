@@ -401,6 +401,10 @@ export function getTokensForChain(chainId = 1) {
  */
 export function getDefaultPair(chainId = 1) {
     const tokens = getTokensForChain(chainId);
+    // For Ethereum, default to ETH → WISE (skip WETH at index 1)
+    if (chainId === 1 && tokens.length > 2) {
+        return { tokenIn: tokens[0], tokenOut: tokens[2] }; // ETH → WISE
+    }
     return {
         tokenIn: tokens[0],
         tokenOut: tokens.length > 1 ? tokens[1] : tokens[0],

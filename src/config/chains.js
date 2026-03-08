@@ -102,7 +102,7 @@ export const CHAINS = {
             v3Router: '0xE592427A0AEce92De3Edee1F18E0157C05861564',
             v3QuoterV2: '0x61fFE014bA17989E743c5F6cB21bF9697530B21e',
             v4PoolManager: '0x000000000004444c5dc75cB358380D2e3dE08A90',
-            v4UniversalRouter: '0x1095692a6237d83c6a72f3F5eFeA8Fbc5F8e9547',
+            v4UniversalRouter: '0x1095692A6237d83C6a72F3F5eFEdb9A670C49223',
             v4Quoter: '0xb3d5c3dfc3a7aebff71895a7191796bffc2c81b9',
         },
         gasConfig: { minTipWei: 1_000_000_000n, maxTipWei: 50_000_000_000n }, // 1–50 gwei (Polygon tips are higher)
@@ -150,7 +150,7 @@ export const CHAINS = {
             v3Router: '0xB971eF87ede563556b2ED4b1C0b0019111Dd85d2',
             v3QuoterV2: '0x78D78E420Da98ad378D7799bE8f4AF69033EB077',
             v4PoolManager: null,
-            v4UniversalRouter: null,
+            v4UniversalRouter: '0x1906c1d672b88cd1b9ac7593301ca990f94eae07',
         },
         gasConfig: { minTipWei: 100_000_000n, maxTipWei: 3_000_000_000n }, // 0.1–3 gwei
         versions: ['V2', 'V3'],
@@ -171,7 +171,7 @@ export const CHAINS = {
             v2Router: '0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24',
             v3Factory: '0x740b1c1de25031C31FF4fC9A62f554A55cdC1baD',
             v3Router: '0xbb00FF08d01D300023C629E8fFfFcb65A5a578cE',
-            v3QuoterV2: '0xbe0e001A5553000F7f09C10Da3b2b0A1b93e tried',
+            v3QuoterV2: '0xbe0F5544EC67e9B3b2D979aaA43f18Fd87E6257F',
             v4PoolManager: null,
             v4UniversalRouter: null,
         },
