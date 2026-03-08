@@ -57,7 +57,7 @@ export class Leaderboard {
                 <div class="leaderboard-header">
                     <button class="leaderboard-back" id="lb-back">← Back</button>
                     <h2 class="leaderboard-title">🏆 Points Leaderboard</h2>
-                    <p class="leaderboard-subtitle">Earn 1 point per $0.01 in swap volume</p>
+                    <p class="leaderboard-subtitle">Earn points for trading</p>
                 </div>
 
                 <div class="leaderboard-lookup">

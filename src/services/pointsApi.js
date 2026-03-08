@@ -5,10 +5,24 @@
  * so the main app works fine without the points backend.
  */
 
-const API_BASE = 'http://localhost:3001/api';
+// Only attempt to reach the points API when running locally.
+// On deployed sites, the API would need to be hosted separately —
+// until then, all calls gracefully return null ("Points unavailable").
+function getApiBase() {
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1') {
+        return 'http://localhost:3001/api';
+    }
+    // For production: set your deployed API URL here, e.g.:
+    // return 'https://your-points-api.example.com/api';
+    return null; // No API available → all calls return null
+}
+
+const API_BASE = getApiBase();
 const TIMEOUT_MS = 3000;
 
 async function fetchWithTimeout(url, timeoutMs = TIMEOUT_MS) {
+    if (!url) return null;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
