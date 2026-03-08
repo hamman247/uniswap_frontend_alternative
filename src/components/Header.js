@@ -2,6 +2,7 @@
  * Header Component — Logo, navigation, chain selector, and wallet
  */
 import { getVisibleChains, getChain, CHAINS } from '../config/chains.js';
+import { t } from '../i18n/i18n.js';
 
 export class Header {
   constructor({ onConnectWallet, onChainSelect, onNavSwap, onNavLeaderboard }) {
@@ -26,8 +27,8 @@ export class Header {
       </a>
 
       <nav class="header-nav">
-        <button class="header-nav-item active" id="nav-swap">Swap</button>
-        <a class="header-nav-item" href="https://app.uniswap.org/positions/create?currencyA=NATIVE&currencyB=0x66a0f676479Cee1d7373f3DC2e2952778BfF5bd6&chain=ethereum&fee={%22isDynamic%22:false,%22feeAmount%22:100,%22tickSpacing%22:1}&hook=undefined&priceRangeState={%22priceInverted%22:false,%22fullRange%22:false,%22initialPrice%22:%22%22,%22inputMode%22:%22price%22}&depositState={%22exactField%22:%22TOKEN0%22,%22exactAmounts%22:{}}&step=0" target="_blank" rel="noopener noreferrer">Pools</a>
+        <button class="header-nav-item active" id="nav-swap">${t('swap')}</button>
+        <a class="header-nav-item" href="https://app.uniswap.org/positions/create?currencyA=NATIVE&currencyB=0x66a0f676479Cee1d7373f3DC2e2952778BfF5bd6&chain=ethereum&fee={%22isDynamic%22:false,%22feeAmount%22:100,%22tickSpacing%22:1}&hook=undefined&priceRangeState={%22priceInverted%22:false,%22fullRange%22:false,%22initialPrice%22:%22%22,%22inputMode%22:%22price%22}&depositState={%22exactField%22:%22TOKEN0%22,%22exactAmounts%22:{}}&step=0" target="_blank" rel="noopener noreferrer">${t('pools')}</a>
       </nav>
 
       <div class="header-actions">
@@ -44,7 +45,7 @@ export class Header {
           </div>
         </div>
         <button class="btn-connect" id="wallet-connect-btn">
-          <span id="wallet-btn-text">Connect</span>
+          <span id="wallet-btn-text">${t('connect')}</span>
         </button>
       </div>
     `;
@@ -170,7 +171,7 @@ export class Header {
       text.textContent = short;
       btn.classList.add('connected');
     } else {
-      text.textContent = 'Connect Wallet';
+      text.textContent = t('connectWallet');
       btn.classList.remove('connected');
     }
   }

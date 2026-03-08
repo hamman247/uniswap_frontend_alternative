@@ -8,6 +8,7 @@ import { findOptimalRoute } from '../routing/optimizer.js';
 import { discoverPools } from '../routing/poolDiscovery.js';
 import { getCachedBalance } from '../utils/balances.js';
 import { estimateGasCostUsd } from '../utils/gasOracle.js';
+import { t } from '../i18n/i18n.js';
 
 export class SwapCard {
   constructor({ onSwap, onSelectToken, onOpenSettings, routeVisualizer, getProvider, getSlippage }) {
@@ -36,8 +37,8 @@ export class SwapCard {
 
     card.innerHTML = `
       <div class="swap-card-header">
-        <span class="swap-card-title">Swap</span>
-        <button class="swap-card-settings-btn" id="swap-settings-btn" title="Transaction Settings">
+        <span class="swap-card-title" data-i18n="swap">${t('swap')}</span>
+        <button class="swap-card-settings-btn" id="swap-settings-btn" title="${t('settings')}">
           ${ICONS.settings}
         </button>
       </div>
@@ -45,9 +46,9 @@ export class SwapCard {
       <!-- Token In -->
       <div class="token-input-wrapper" id="input-wrapper-in">
         <div class="token-input-label">
-          <span class="token-input-label-text">You Pay</span>
+          <span class="token-input-label-text" data-i18n="youPay">${t('youPay')}</span>
           <span class="token-input-balance-group">
-            <span id="balance-in">Balance: —</span>
+            <span id="balance-in">${t('balance')}: —</span>
             <button class="max-btn" id="max-btn">MAX</button>
           </span>
         </div>
@@ -77,8 +78,8 @@ export class SwapCard {
       <!-- Token Out -->
       <div class="token-input-wrapper" id="input-wrapper-out">
         <div class="token-input-label">
-          <span class="token-input-label-text">You Receive</span>
-          <span class="token-input-balance" id="balance-out">Balance: —</span>
+          <span class="token-input-label-text" data-i18n="youReceive">${t('youReceive')}</span>
+          <span class="token-input-balance" id="balance-out">${t('balance')}: —</span>
         </div>
         <div class="token-input-row">
           <input
@@ -99,36 +100,36 @@ export class SwapCard {
       <!-- Info Section -->
       <div class="swap-info" id="swap-info" style="display: none;">
         <div class="swap-info-row">
-          <span class="swap-info-label">
-            Rate
+          <span class="swap-info-label" data-i18n="rate">
+            ${t('rate')}
           </span>
           <span class="swap-info-value" id="swap-rate">—</span>
         </div>
         <div class="swap-info-divider"></div>
         <div class="swap-info-row">
-          <span class="swap-info-label">
-            Interface Fee
-            <span class="info-icon tooltip" data-tooltip="No interface fee — 0 bps">?</span>
+          <span class="swap-info-label" data-i18n="interfaceFee">
+            ${t('interfaceFee')}
+            <span class="info-icon tooltip" data-tooltip="${t('feeTooltip')}">?</span>
           </span>
           <span class="swap-info-value" id="swap-fee">—</span>
         </div>
         <div class="swap-info-row">
-          <span class="swap-info-label">Price Impact</span>
+          <span class="swap-info-label" data-i18n="priceImpact">${t('priceImpact')}</span>
           <span class="swap-info-value" id="swap-impact">—</span>
         </div>
         <div class="swap-info-row">
-          <span class="swap-info-label">Min. Received</span>
+          <span class="swap-info-label" data-i18n="minReceived">${t('minReceived')}</span>
           <span class="swap-info-value" id="swap-min-received">—</span>
         </div>
         <div class="swap-info-row">
-          <span class="swap-info-label">Network Cost</span>
+          <span class="swap-info-label" data-i18n="networkCost">${t('networkCost')}</span>
           <span class="swap-info-value" id="swap-gas">—</span>
         </div>
       </div>
 
       <!-- Submit Button -->
       <button class="swap-submit-btn disabled" id="swap-submit-btn">
-        Enter an amount
+        ${t('enterAmount')}
       </button>
     `;
 
@@ -140,7 +141,7 @@ export class SwapCard {
   _renderTokenButton(token) {
     if (!token) {
       return `
-        <span class="token-symbol-text" style="color: white;">Select token</span>
+        <span class="token-symbol-text" style="color: white;">${t('selectToken')}</span>
         <svg class="token-selector-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M6 9l6 6 6-6"/>
         </svg>
@@ -206,6 +207,17 @@ export class SwapCard {
     // Submit
     this.element.querySelector('#swap-submit-btn').addEventListener('click', () => {
       if (this.currentRoute && this.onSwap) {
+        // Check balance before swapping
+        const bal = getCachedBalance(this.tokenIn.address);
+        if (bal && this.amountIn) {
+          const { ethers } = window._ethersLib || {};
+          const inputRaw = this.currentRoute.totalAmountIn;
+          if (inputRaw > bal.raw) {
+            // Show inline notification via the swap card
+            this._showBalanceError();
+            return;
+          }
+        }
         this.onSwap(this.currentRoute, this.tokenIn, this.tokenOut);
       }
     });
@@ -277,12 +289,12 @@ export class SwapCard {
     if (this.tokenIn) {
       const balIn = getCachedBalance(this.tokenIn.address);
       const el = this.element.querySelector('#balance-in');
-      el.textContent = balIn ? `Balance: ${balIn.formatted}` : 'Balance: —';
+      el.textContent = balIn ? `${t('balance')}: ${balIn.formatted}` : `${t('balance')}: —`;
     }
     if (this.tokenOut) {
       const balOut = getCachedBalance(this.tokenOut.address);
       const el = this.element.querySelector('#balance-out');
-      el.textContent = balOut ? `Balance: ${balOut.formatted}` : 'Balance: —';
+      el.textContent = balOut ? `${t('balance')}: ${balOut.formatted}` : `${t('balance')}: —`;
     }
   }
 
@@ -293,7 +305,7 @@ export class SwapCard {
     }
 
     this.isLoading = true;
-    this._updateSubmitButton('loading', 'Finding best route...');
+    this._updateSubmitButton('loading', t('findingRoute'));
     if (this.routeVisualizer) this.routeVisualizer.showLoading();
 
     try {
@@ -336,7 +348,7 @@ export class SwapCard {
         if (this.routeVisualizer) this.routeVisualizer.update(route);
 
         const walletProvider = this.getProvider ? this.getProvider() : null;
-        this._updateSubmitButton(walletProvider ? 'ready' : 'ready', walletProvider ? action : `Connect Wallet to ${action}`);
+        this._updateSubmitButton(walletProvider ? 'ready' : 'ready', walletProvider ? action : `${t('connectWallet')}`);
         this.isLoading = false;
         return;
       }
@@ -380,7 +392,7 @@ export class SwapCard {
       this.currentRoute = route;
 
       if (!route || route.totalAmountOut === 0n) {
-        this._updateSubmitButton('disabled', 'Insufficient liquidity');
+        this._updateSubmitButton('disabled', t('noRouteFound'));
         this._clearOutput();
         return;
       }
@@ -470,7 +482,56 @@ export class SwapCard {
     this.currentRoute = null;
     this.element.querySelector('#amount-input-out').value = '';
     this.element.querySelector('#swap-info').style.display = 'none';
-    this._updateSubmitButton('disabled', this.amountIn ? 'Enter an amount' : 'Enter an amount');
+    this._updateSubmitButton('disabled', t('enterAmount'));
     if (this.routeVisualizer) this.routeVisualizer.hide();
+  }
+
+  _showBalanceError() {
+    // Brief red flash on the submit button
+    this._updateSubmitButton('disabled', t('balanceNotEnough'));
+    // Also show a floating notification
+    const notification = document.createElement('div');
+    notification.className = 'notification error';
+    notification.textContent = t('balanceNotEnough');
+    document.body.appendChild(notification);
+    setTimeout(() => {
+      notification.style.opacity = '0';
+      notification.style.transform = 'translateX(100px)';
+      notification.style.transition = 'all 0.3s ease';
+      setTimeout(() => notification.remove(), 300);
+    }, 3000);
+    // Reset button after a moment
+    setTimeout(() => {
+      if (this.currentRoute) {
+        this._updateSubmitButton('ready', t('swapBtn'));
+      }
+    }, 2000);
+  }
+
+  /**
+   * Update all translatable text to the current locale
+   */
+  updateLocale() {
+    if (!this.element) return;
+    // Static labels
+    this.element.querySelectorAll('[data-i18n]').forEach(el => {
+      const key = el.getAttribute('data-i18n');
+      // Keep child nodes (like the tooltip ?)
+      const firstText = el.childNodes[0];
+      if (firstText && firstText.nodeType === Node.TEXT_NODE) {
+        firstText.textContent = t(key);
+      } else {
+        el.textContent = t(key);
+      }
+    });
+    // Balances
+    this.updateBalances();
+    // Submit button (if not in a loading/specific state)
+    const btn = this.element.querySelector('#swap-submit-btn');
+    if (btn.classList.contains('disabled') && !this.isLoading) {
+      btn.textContent = t('enterAmount');
+    } else if (btn.classList.contains('ready')) {
+      btn.textContent = t('swapBtn');
+    }
   }
 }

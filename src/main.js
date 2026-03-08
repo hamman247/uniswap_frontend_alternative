@@ -11,6 +11,7 @@ import { SwapCard } from './components/SwapCard.js';
 import { TokenModal } from './components/TokenModal.js';
 import { Settings } from './components/Settings.js';
 import { RouteVisualizer } from './components/RouteVisualizer.js';
+import { LanguageSelector } from './components/LanguageSelector.js';
 import { walletConnect } from './components/WalletConnect.js';
 import { executeRoute } from './routing/executor.js';
 import { fetchAllBalances, clearBalanceCache } from './utils/balances.js';
@@ -18,6 +19,7 @@ import { clearGasPriceCache } from './utils/gasOracle.js';
 import { setCurrentChainId } from './config/contracts.js';
 import { getTokensForChain, getDefaultPair } from './config/tokens.js';
 import { getChain } from './config/chains.js';
+import { initLocale, t, onLocaleChange } from './i18n/i18n.js';
 
 class App {
     constructor() {
@@ -102,17 +104,20 @@ class App {
         this.swapContent.appendChild(adMid);
 
         // ─── Footer Attribution ───
-        const footer = document.createElement('div');
-        footer.style.cssText = 'text-align: center; padding: 24px; font-size: 0.75rem; color: var(--text-tertiary);';
-        footer.innerHTML = `
-      <p style="margin-bottom: 4px;">Routing optimized across Uniswap V2 · V3 · V4</p>
-      <p style="margin-bottom: 4px;">No interface fees</p>
-      <p style="margin-top: 12px; opacity: 0.7; font-style: italic;">Buy and sell cryptocurrencies at your own risk. Always Do Your Own Research.</p>
-    `;
-        this.swapContent.appendChild(footer);
+        this.footer = document.createElement('div');
+        this.footer.style.cssText = 'text-align: center; padding: 24px; font-size: 0.75rem; color: var(--text-tertiary);';
+        this._updateFooter();
+        this.swapContent.appendChild(this.footer);
 
         // Show swap page by default
         main.appendChild(this.swapContent);
+
+        // ─── Language Selector (bottom corner) ───
+        this.langSelector = new LanguageSelector();
+        document.body.appendChild(this.langSelector.render());
+
+        // ─── Locale change listener ───
+        onLocaleChange(() => this._onLocaleChange());
 
 
         // ─── Token Modal ───
@@ -271,7 +276,7 @@ class App {
         if (!walletConnect.signer) {
             const connected = await walletConnect.connect();
             if (!connected) {
-                this._showNotification('error', 'Please connect your wallet to swap');
+                this._showNotification('error', t('connectPrompt'));
                 return;
             }
         }
@@ -291,12 +296,37 @@ class App {
                 deadline
             );
 
-            this._showNotification('success', `✅ Swap submitted! ${txResults.length} transaction(s)`);
+            this._showNotification('success', `${t('swapSubmitted')} ${txResults.length} ${t('txCount')}`);
         } catch (error) {
             console.error('Swap execution error:', error);
             const msg = error.reason || error.message || 'Transaction failed';
             this._showNotification('error', `❌ ${msg}`);
         }
+    }
+
+    _updateFooter() {
+        this.footer.innerHTML = `
+      <p style="margin-bottom: 4px;">${t('routingOptimized')}</p>
+      <p style="margin-bottom: 4px;">${t('noFees')}</p>
+      <p style="margin-top: 12px; opacity: 0.7; font-style: italic;">${t('disclaimer')}</p>
+    `;
+    }
+
+    _onLocaleChange() {
+        // Re-render translated parts
+        this._updateFooter();
+        // Re-render the header nav text
+        const navSwap = document.querySelector('#nav-swap');
+        if (navSwap) navSwap.textContent = t('swap');
+        // Pools link
+        const poolsLink = document.querySelector('.header-nav a.header-nav-item');
+        if (poolsLink) poolsLink.textContent = t('pools');
+        // Connect button
+        const walletText = document.querySelector('#wallet-btn-text');
+        if (walletText && !this.header?.walletAddress) walletText.textContent = t('connect');
+        // Re-render the swap card and settings in-place
+        if (this.swapCard) this.swapCard.updateLocale();
+        if (this.settings) this.settings.updateLocale();
     }
 
 
@@ -324,6 +354,7 @@ let initialized = false;
 function initOnce() {
     if (initialized) return;
     initialized = true;
+    initLocale();
     app.init();
 }
 document.addEventListener('DOMContentLoaded', initOnce);
