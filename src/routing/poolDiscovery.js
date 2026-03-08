@@ -66,21 +66,21 @@ export async function discoverPools(provider, tokenIn, tokenOut) {
     const addressIn = getRoutingAddress(tokenIn, chainId);
     const addressOut = getRoutingAddress(tokenOut, chainId);
 
-    // 1. Try direct pools first (on-chain probing)
-    const directPools = await discoverDirectPools(provider, addressIn, addressOut, chainId);
-    if (directPools.length > 0) {
-        return directPools;
+    // 1. Discover direct AND multi-hop routes in parallel
+    //    The optimizer's greedy split will pick the best combination
+    const [directPools, multiHopPools] = await Promise.all([
+        discoverDirectPools(provider, addressIn, addressOut, chainId),
+        discoverMultiHopPools(provider, addressIn, addressOut, chainId),
+    ]);
+
+    const allPools = [...directPools, ...multiHopPools];
+
+    if (allPools.length > 0) {
+        console.log(`Found ${directPools.length} direct + ${multiHopPools.length} multi-hop pool(s)`);
+        return allPools;
     }
 
-    // 2. No direct pools — try multi-hop through bridge tokens (on-chain)
-    console.log('No direct pools found, trying multi-hop routing...');
-    const multiHopPools = await discoverMultiHopPools(provider, addressIn, addressOut, chainId);
-    if (multiHopPools.length > 0) {
-        return multiHopPools;
-    }
-
-    // 3. Fallback: ask the Uniswap Routing API for a route
-    // This handles V4 pools with custom hooks that can't be discovered by on-chain brute-force
+    // 2. Fallback: ask the Uniswap Routing API for a route
     console.log('On-chain discovery failed, trying Uniswap Routing API...');
     const apiPools = await discoverViaUniswapAPI(tokenIn, tokenOut, chainId);
     return apiPools;
@@ -118,7 +118,8 @@ async function discoverDirectPools(provider, addressIn, addressOut, chainId) {
 /**
  * Discover multi-hop routes through intermediary tokens.
  * For each bridge token B, tries tokenIn→B then B→tokenOut.
- * Returns pool pairs as a single "multi-hop pool" descriptor.
+ * Creates multi-hop route descriptors for ALL combinations of
+ * leg1 and leg2 pools so the optimizer can pick the best.
  */
 async function discoverMultiHopPools(provider, addressIn, addressOut, chainId) {
     const bridgeTokens = getBridgeTokens(chainId);
@@ -138,22 +139,27 @@ async function discoverMultiHopPools(provider, addressIn, addressOut, chainId) {
             ]);
 
             if (leg1Pools.length > 0 && leg2Pools.length > 0) {
-                // Pick the best pool (highest liquidity) for each leg
-                const bestLeg1 = pickBestPool(leg1Pools);
-                const bestLeg2 = pickBestPool(leg2Pools);
+                // Generate multi-hop routes for all combinations of leg1 × leg2 pools
+                // Cap at top 3 per leg to keep it reasonable
+                const topLeg1 = leg1Pools.slice(0, 3);
+                const topLeg2 = leg2Pools.slice(0, 3);
 
-                multiHopPools.push({
-                    version: `${bestLeg1.version}→${bestLeg2.version}`,
-                    isMultiHop: true,
-                    intermediary: bridge,
-                    leg1: bestLeg1,
-                    leg2: bestLeg2,
-                    tokenIn: addressIn,
-                    tokenOut: addressOut,
-                    fee: bestLeg1.fee + bestLeg2.fee,
-                    feeLabel: `${((bestLeg1.fee + bestLeg2.fee) / 10000).toFixed(2)}%`,
-                    gasEstimate: bestLeg1.gasEstimate + bestLeg2.gasEstimate,
-                });
+                for (const l1 of topLeg1) {
+                    for (const l2 of topLeg2) {
+                        multiHopPools.push({
+                            version: `${l1.version}→${l2.version}`,
+                            isMultiHop: true,
+                            intermediary: bridge,
+                            leg1: l1,
+                            leg2: l2,
+                            tokenIn: addressIn,
+                            tokenOut: addressOut,
+                            fee: l1.fee + l2.fee,
+                            feeLabel: `${((l1.fee + l2.fee) / 10000).toFixed(2)}%`,
+                            gasEstimate: l1.gasEstimate + l2.gasEstimate,
+                        });
+                    }
+                }
             }
         } catch (e) {
             // This intermediary didn't work — skip it
