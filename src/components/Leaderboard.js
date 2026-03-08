@@ -1,5 +1,5 @@
 /**
- * Leaderboard — Top 100 addresses by OwlSwap points
+ * Leaderboard — Top 100 addresses by WiseSwap points
  *
  * Shows a styled table of top earners + address lookup input.
  * Displays "Points unavailable" when the API is down.

@@ -1,5 +1,5 @@
 /**
- * OwlSwap — Main Application Entry Point
+ * WiseSwap — Main Application Entry Point
  *
  * Initializes all components and wires them together.
  * Supports routing through Uniswap V2, V3, and V4 pools
@@ -83,7 +83,7 @@ class App {
         const adTop = document.createElement('div');
         adTop.className = 'ad-banner ad-banner-top';
         adTop.id = 'ad-slot-top';
-        adTop.innerHTML = `<div class="ad-placeholder">Advertisement</div>`;
+        adTop.innerHTML = `<div id="frame" style="width: 100%;margin: auto;position: relative; z-index: 99998;"><iframe data-aa='2429840' src='//acceptable.a-ads.com/2429840/?size=Adaptive' style='border:0; padding:0; width:70%; height:auto; overflow:hidden;display: block;margin: auto'></iframe></div>`;
         this.swapContent.appendChild(adTop);
 
         // Wrap swap card with relative positioning for settings overlay
@@ -100,7 +100,7 @@ class App {
         const adMid = document.createElement('div');
         adMid.className = 'ad-banner ad-banner-mid';
         adMid.id = 'ad-slot-mid';
-        adMid.innerHTML = `<div class="ad-placeholder">Advertisement</div>`;
+        adMid.innerHTML = `<div id="frame" style="width: 100%;margin: auto;position: relative; z-index: 99998;"><iframe data-aa='2429840' src='//acceptable.a-ads.com/2429840/?size=Adaptive' style='border:0; padding:0; width:70%; height:auto; overflow:hidden;display: block;margin: auto'></iframe></div>`;
         this.swapContent.appendChild(adMid);
 
         // ─── Footer Attribution ───
@@ -154,7 +154,7 @@ class App {
             });
         }
 
-        console.log('🦉 OwlSwap initialized — V2/V3/V4 routing, zero fees');
+        console.log('🚀 WiseSwap initialized — V2/V3/V4 routing, zero fees');
     }
 
     /**

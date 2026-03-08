@@ -1,7 +1,7 @@
 {
-    "name": "owlswap-points-api",
+    "name": "wiseswap-points-api",
     "version": "1.0.0",
-    "description": "OwlSwap Points Indexer — tracks swap volume and awards points",
+    "description": "WiseSwap Points Indexer — tracks swap volume and awards points",
     "main": "server.js",
     "scripts": {
         "start": "node server.js",

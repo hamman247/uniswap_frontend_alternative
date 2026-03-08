@@ -1,5 +1,5 @@
 /**
- * OwlSwap Points API — Express Server
+ * WiseSwap Points API — Express Server
  *
  * REST API for querying user points and leaderboard.
  * Runs a background scanner that indexes OWLSWAP-tagged transactions.
@@ -95,7 +95,7 @@ app.get('/api/leaderboard/:address', (req, res) => {
 
 // ─── Start server ───
 app.listen(PORT, () => {
-    console.log(`\n🦉 OwlSwap Points API running on http://localhost:${PORT}`);
+    console.log(`\n🦉 WiseSwap Points API running on http://localhost:${PORT}`);
     console.log(`   Chain: ${CHAIN_ID} | RPC: ${RPC_URL}`);
     console.log(`   Scanner interval: ${SCAN_INTERVAL_MS / 1000}s\n`);
 

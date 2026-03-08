@@ -1,5 +1,5 @@
 /**
- * OwlSwap Points — SQLite Database Module
+ * WiseSwap Points — SQLite Database Module
  *
  * Stores per-address points (1 point per $0.01 swap volume)
  * and individual transaction records.

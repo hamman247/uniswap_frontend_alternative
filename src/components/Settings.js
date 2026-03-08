@@ -13,7 +13,7 @@ export class Settings {
     this.slippage = DEFAULT_SLIPPAGE;
     this.deadline = DEFAULT_DEADLINE;
     this.expertMode = false;
-    this.showTestnets = localStorage.getItem('owlswap_testnets') === 'true';
+    this.showTestnets = localStorage.getItem('wiseswap_testnets') === 'true';
     this.element = null;
   }
 
@@ -104,7 +104,7 @@ export class Settings {
     // Testnet toggle
     this.element.querySelector('#testnet-toggle').addEventListener('change', (e) => {
       this.showTestnets = e.target.checked;
-      localStorage.setItem('owlswap_testnets', String(this.showTestnets));
+      localStorage.setItem('wiseswap_testnets', String(this.showTestnets));
       this._emitUpdate();
     });
   }

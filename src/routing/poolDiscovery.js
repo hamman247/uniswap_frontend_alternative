@@ -295,7 +295,7 @@ async function discoverV3Pools(provider, tokenIn, tokenOut) {
 const v4PoolKeyCache = new Map();
 
 // ─── localStorage cache helpers for V4 pools ───
-const V4_CACHE_PREFIX = 'owlswap_v4_pools_';
+const V4_CACHE_PREFIX = 'wiseswap_v4_pools_';
 const V4_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 function loadCachedV4Pools(cacheKey) {

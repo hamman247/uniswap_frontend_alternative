@@ -1,5 +1,5 @@
 /**
- * OwlSwap Points — Block Scanner
+ * WiseSwap Points — Block Scanner
  *
  * Scans Ethereum blocks for Universal Router transactions
  * that end with the OWLSWAP tracking tag (0x4f574c53574150).
@@ -81,7 +81,7 @@ function estimateVolumeUsd(receipt, tx, ethPrice) {
 }
 
 /**
- * Scan a range of blocks for tagged OwlSwap transactions.
+ * Scan a range of blocks for tagged WiseSwap transactions.
  */
 async function scanBlocks(provider, fromBlock, toBlock, chainId = 1) {
     const ethPrice = await fetchEthPrice();

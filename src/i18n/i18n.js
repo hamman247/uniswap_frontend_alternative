@@ -1,5 +1,5 @@
 /**
- * OwlSwap i18n — Lightweight internationalization
+ * WiseSwap i18n — Lightweight internationalization
  *
  * Auto-detects browser language, supports manual override via localStorage.
  * t('key') returns the translated string for the current locale.
@@ -53,8 +53,8 @@ const translations = {
         // Language
         language: 'Language',
         // Meta
-        metaTitle: 'OwlSwap — Multi-Version Uniswap Router',
-        metaDescription: 'OwlSwap — swap tokens with optimal routing across Uniswap V2, V3, and V4 pools.',
+        metaTitle: 'WiseSwap — Multi-Version Uniswap Router',
+        metaDescription: 'WiseSwap — swap tokens with optimal routing across Uniswap V2, V3, and V4 pools.',
     },
 
     es: {
@@ -94,8 +94,8 @@ const translations = {
         noFees: 'Sin tarifas de interfaz',
         disclaimer: 'Compra y vende criptomonedas bajo tu propio riesgo. Siempre investiga por tu cuenta.',
         language: 'Idioma',
-        metaTitle: 'OwlSwap — Enrutador Multi-Versión de Uniswap',
-        metaDescription: 'OwlSwap — intercambia tokens con ruteo óptimo a través de pools de Uniswap V2, V3 y V4.',
+        metaTitle: 'WiseSwap — Enrutador Multi-Versión de Uniswap',
+        metaDescription: 'WiseSwap — intercambia tokens con ruteo óptimo a través de pools de Uniswap V2, V3 y V4.',
     },
 
     zh: {
@@ -135,8 +135,8 @@ const translations = {
         noFees: '无界面费用',
         disclaimer: '买卖加密货币风险自负，请务必自行研究。',
         language: '语言',
-        metaTitle: 'OwlSwap — Uniswap 多版本路由器',
-        metaDescription: 'OwlSwap — 通过 Uniswap V2、V3 和 V4 流动池进行最优路由代币兑换。',
+        metaTitle: 'WiseSwap — Uniswap 多版本路由器',
+        metaDescription: 'WiseSwap — 通过 Uniswap V2、V3 和 V4 流动池进行最优路由代币兑换。',
     },
 
     fr: {
@@ -176,8 +176,8 @@ const translations = {
         noFees: 'Pas de frais d\'interface',
         disclaimer: 'Achetez et vendez des cryptomonnaies à vos propres risques. Faites toujours vos propres recherches.',
         language: 'Langue',
-        metaTitle: 'OwlSwap — Routeur Multi-Version Uniswap',
-        metaDescription: 'OwlSwap — échangez des jetons avec un routage optimal via les pools Uniswap V2, V3 et V4.',
+        metaTitle: 'WiseSwap — Routeur Multi-Version Uniswap',
+        metaDescription: 'WiseSwap — échangez des jetons avec un routage optimal via les pools Uniswap V2, V3 et V4.',
     },
 
     de: {
@@ -217,8 +217,8 @@ const translations = {
         noFees: 'Keine Schnittstellengebühren',
         disclaimer: 'Kryptowährungen kaufen und verkaufen auf eigenes Risiko. Recherchieren Sie immer selbst.',
         language: 'Sprache',
-        metaTitle: 'OwlSwap — Multi-Version Uniswap Router',
-        metaDescription: 'OwlSwap — Token tauschen mit optimiertem Routing über Uniswap V2, V3 und V4 Pools.',
+        metaTitle: 'WiseSwap — Multi-Version Uniswap Router',
+        metaDescription: 'WiseSwap — Token tauschen mit optimiertem Routing über Uniswap V2, V3 und V4 Pools.',
     },
 
     ja: {
@@ -258,8 +258,8 @@ const translations = {
         noFees: 'インターフェース手数料なし',
         disclaimer: '暗号資産の売買は自己責任で行ってください。必ずご自身で調査を行ってください。',
         language: '言語',
-        metaTitle: 'OwlSwap — マルチバージョン Uniswap ルーター',
-        metaDescription: 'OwlSwap — Uniswap V2、V3、V4プールを横断する最適ルーティングでトークンをスワップ。',
+        metaTitle: 'WiseSwap — マルチバージョン Uniswap ルーター',
+        metaDescription: 'WiseSwap — Uniswap V2、V3、V4プールを横断する最適ルーティングでトークンをスワップ。',
     },
 
     ko: {
@@ -299,8 +299,8 @@ const translations = {
         noFees: '인터페이스 수수료 없음',
         disclaimer: '암호화폐 매매는 본인 책임입니다. 항상 직접 조사하세요.',
         language: '언어',
-        metaTitle: 'OwlSwap — 멀티버전 Uniswap 라우터',
-        metaDescription: 'OwlSwap — Uniswap V2, V3, V4 풀 전반에서 최적 라우팅으로 토큰 스왑.',
+        metaTitle: 'WiseSwap — 멀티버전 Uniswap 라우터',
+        metaDescription: 'WiseSwap — Uniswap V2, V3, V4 풀 전반에서 최적 라우팅으로 토큰 스왑.',
     },
 
     pt: {
@@ -340,8 +340,8 @@ const translations = {
         noFees: 'Sem taxas de interface',
         disclaimer: 'Compre e venda criptomoedas por sua conta e risco. Sempre faça sua própria pesquisa.',
         language: 'Idioma',
-        metaTitle: 'OwlSwap — Roteador Multi-Versão Uniswap',
-        metaDescription: 'OwlSwap — troque tokens com roteamento otimizado através de pools Uniswap V2, V3 e V4.',
+        metaTitle: 'WiseSwap — Roteador Multi-Versão Uniswap',
+        metaDescription: 'WiseSwap — troque tokens com roteamento otimizado através de pools Uniswap V2, V3 e V4.',
     },
 
     ru: {
@@ -381,8 +381,8 @@ const translations = {
         noFees: 'Без комиссий интерфейса',
         disclaimer: 'Покупайте и продавайте криптовалюты на свой страх и риск. Всегда проводите собственное исследование.',
         language: 'Язык',
-        metaTitle: 'OwlSwap — Мульти-версионный маршрутизатор Uniswap',
-        metaDescription: 'OwlSwap — обмен токенов с оптимальной маршрутизацией через пулы Uniswap V2, V3 и V4.',
+        metaTitle: 'WiseSwap — Мульти-версионный маршрутизатор Uniswap',
+        metaDescription: 'WiseSwap — обмен токенов с оптимальной маршрутизацией через пулы Uniswap V2, V3 и V4.',
     },
 
     ar: {
@@ -422,8 +422,8 @@ const translations = {
         noFees: 'بدون رسوم واجهة',
         disclaimer: 'اشترِ وبع العملات المشفرة على مسؤوليتك الخاصة. قم دائمًا بإجراء بحثك الخاص.',
         language: 'اللغة',
-        metaTitle: 'OwlSwap — موجّه متعدد الإصدارات لـ Uniswap',
-        metaDescription: 'OwlSwap — تبديل الرموز مع التوجيه الأمثل عبر أحواض Uniswap V2 و V3 و V4.',
+        metaTitle: 'WiseSwap — موجّه متعدد الإصدارات لـ Uniswap',
+        metaDescription: 'WiseSwap — تبديل الرموز مع التوجيه الأمثل عبر أحواض Uniswap V2 و V3 و V4.',
     },
 
     tr: {
@@ -463,8 +463,8 @@ const translations = {
         noFees: 'Arayüz ücreti yok',
         disclaimer: 'Kripto para alım satımı kendi riskinize aittir. Her zaman kendi araştırmanızı yapın.',
         language: 'Dil',
-        metaTitle: 'OwlSwap — Çok Sürümlü Uniswap Yönlendirici',
-        metaDescription: 'OwlSwap — Uniswap V2, V3 ve V4 havuzları arasında en iyi yönlendirme ile token takası.',
+        metaTitle: 'WiseSwap — Çok Sürümlü Uniswap Yönlendirici',
+        metaDescription: 'WiseSwap — Uniswap V2, V3 ve V4 havuzları arasında en iyi yönlendirme ile token takası.',
     },
 
     vi: {
@@ -504,8 +504,8 @@ const translations = {
         noFees: 'Không phí giao diện',
         disclaimer: 'Mua bán tiền mã hóa là rủi ro của bạn. Luôn tự nghiên cứu.',
         language: 'Ngôn ngữ',
-        metaTitle: 'OwlSwap — Bộ định tuyến đa phiên bản Uniswap',
-        metaDescription: 'OwlSwap — hoán đổi token với định tuyến tối ưu qua các pool Uniswap V2, V3 và V4.',
+        metaTitle: 'WiseSwap — Bộ định tuyến đa phiên bản Uniswap',
+        metaDescription: 'WiseSwap — hoán đổi token với định tuyến tối ưu qua các pool Uniswap V2, V3 và V4.',
     },
 };
 
@@ -534,7 +534,7 @@ const listeners = [];
  * Checks localStorage override first, then navigator.language.
  */
 export function initLocale() {
-    const saved = localStorage.getItem('owlswap_locale');
+    const saved = localStorage.getItem('wiseswap_locale');
     if (saved && SUPPORTED_LOCALES.includes(saved)) {
         currentLocale = saved;
     } else {
@@ -565,7 +565,7 @@ export function getLocale() {
 export function setLocale(locale) {
     if (!SUPPORTED_LOCALES.includes(locale)) return;
     currentLocale = locale;
-    localStorage.setItem('owlswap_locale', locale);
+    localStorage.setItem('wiseswap_locale', locale);
     updateDocumentMeta();
     listeners.forEach(fn => fn(locale));
 }

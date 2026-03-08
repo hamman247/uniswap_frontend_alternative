@@ -1,5 +1,5 @@
 /**
- * OwlSwap Points API Client
+ * WiseSwap Points API Client
  *
  * All calls have a timeout and gracefully return null on failure,
  * so the main app works fine without the points backend.

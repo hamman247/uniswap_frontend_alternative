@@ -12,7 +12,7 @@ export class Header {
     this.onNavLeaderboard = onNavLeaderboard;
     this.walletAddress = null;
     this.currentChainId = 1;
-    this.showTestnets = localStorage.getItem('owlswap_testnets') === 'true';
+    this.showTestnets = localStorage.getItem('wiseswap_testnets') === 'true';
     this.chainDropdownOpen = false;
     this.element = null;
   }
@@ -22,8 +22,8 @@ export class Header {
     header.className = 'header';
     header.innerHTML = `
       <a class="header-logo" href="/">
-        <img src="/owl-logo.jpg" alt="OwlSwap" class="header-logo-img" />
-        <span class="header-logo-text">OwlSwap</span>
+        <img src="/owl-logo.jpg" alt="WiseSwap" class="header-logo-img" />
+        <span class="header-logo-text">WiseSwap</span>
       </a>
 
       <nav class="header-nav">
