@@ -176,25 +176,30 @@ async function executeBatchedViaUniversalRouter(
 
     const ZERO_ADDR = '0x0000000000000000000000000000000000000000';
 
-    // Check if any route uses V4 with native ETH (address(0))
-    const hasV4NativeRoute = routeResult.routes.some(r => {
-        const pool = r.pool.isMultiHop ? r.pool.leg1 : r.pool;
-        return pool.version === 'V4' &&
-            (pool.currency0?.toLowerCase() === ZERO_ADDR || pool.currency1?.toLowerCase() === ZERO_ADDR);
-    });
-
-    // If input is native ETH, handle differently for V4 vs V2/V3
+    // If input is native ETH, figure out how much needs to be wrapped for V2/V3
+    // vs left as native ETH for V4 settlement
     if (tokenIn.isNative) {
         totalEthValue = routeResult.totalAmountIn;
-        if (!hasV4NativeRoute) {
-            // V2/V3: wrap ETH to WETH first via the Universal Router
+
+        // Calculate how much goes to V2/V3 legs (needs WETH) vs V4 legs (native ETH)
+        let v2v3Amount = 0n;
+        for (const route of routeResult.routes) {
+            const pool = route.pool.isMultiHop ? route.pool.leg1 : route.pool;
+            const isV4Native = pool.version === 'V4' &&
+                (pool.currency0?.toLowerCase() === ZERO_ADDR || pool.currency1?.toLowerCase() === ZERO_ADDR);
+            if (!isV4Native) {
+                v2v3Amount += route.amountIn;
+            }
+        }
+
+        // Wrap only the V2/V3 portion to WETH; V4 portion stays as native ETH
+        if (v2v3Amount > 0n) {
             commands.push(UR_COMMANDS.WRAP_ETH);
             inputs.push(abiCoder.encode(
                 ['address', 'uint256'],
-                [universalRouterAddr, routeResult.totalAmountAfterFee]
+                [universalRouterAddr, v2v3Amount]
             ));
         }
-        // V4 native: no WRAP_ETH needed — PoolManager settles native ETH via msg.value
     } else {
         // ERC-20 input: ensure approval for the Universal Router
         await ensureApproval(signer, tokenIn.address, universalRouterAddr, routeResult.totalAmountIn, gasOverrides);

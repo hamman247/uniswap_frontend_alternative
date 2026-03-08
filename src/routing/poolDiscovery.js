@@ -288,20 +288,51 @@ async function discoverV3Pools(provider, tokenIn, tokenOut) {
 // Cache discovered V4 pool keys to avoid repeated log scanning
 const v4PoolKeyCache = new Map();
 
-// V4 launch block numbers per chain
-const V4_LAUNCH_BLOCKS = {
-    1: 21688329,     // Ethereum mainnet
-    42161: 296000000, // Arbitrum
-    10: 130000000,   // Optimism
-    137: 66000000,   // Polygon
-    8453: 25000000,  // Base
-};
+// ─── localStorage cache helpers for V4 pools ───
+const V4_CACHE_PREFIX = 'owlswap_v4_pools_';
+const V4_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+function loadCachedV4Pools(cacheKey) {
+    try {
+        const raw = localStorage.getItem(V4_CACHE_PREFIX + cacheKey);
+        if (!raw) return null;
+        const cached = JSON.parse(raw);
+        if (Date.now() - cached.ts > V4_CACHE_TTL_MS) {
+            localStorage.removeItem(V4_CACHE_PREFIX + cacheKey);
+            return null;
+        }
+        // Restore BigInt values
+        return cached.pools.map(p => ({
+            ...p,
+            amountIn: BigInt(p.amountIn),
+            amountOut: BigInt(p.amountOut),
+            sqrtPriceX96: BigInt(p.sqrtPriceX96 || '0'),
+            liquidity: BigInt(p.liquidity || '1'),
+        }));
+    } catch { return null; }
+}
+
+function saveCachedV4Pools(cacheKey, pools) {
+    try {
+        // Convert BigInt to strings for JSON serialization
+        const serializable = pools.map(p => ({
+            ...p,
+            amountIn: p.amountIn.toString(),
+            amountOut: p.amountOut.toString(),
+            sqrtPriceX96: (p.sqrtPriceX96 || 0n).toString(),
+            liquidity: (p.liquidity || 1n).toString(),
+        }));
+        localStorage.setItem(V4_CACHE_PREFIX + cacheKey, JSON.stringify({
+            ts: Date.now(),
+            pools: serializable,
+        }));
+    } catch { /* localStorage full or unavailable */ }
+}
 
 async function discoverV4Pools(provider, tokenIn, tokenOut) {
-    const pools = [];
     const quoterAddr = UNISWAP_V4.quoter;
     const poolManagerAddr = UNISWAP_V4.poolManager;
-    if (!quoterAddr || !poolManagerAddr) return pools;
+    if (!quoterAddr || !poolManagerAddr) return [];
 
     const { ethers } = await import('ethers');
     const chainId = getCurrentChainId();
@@ -312,86 +343,82 @@ async function discoverV4Pools(provider, tokenIn, tokenOut) {
     const tokIn = tokenIn.toLowerCase();
     const tokOut = tokenOut.toLowerCase();
     const weth = wethAddr?.toLowerCase();
-    const native = ZERO_ADDRESS.toLowerCase();
 
-    // Build set of addresses that represent our tokens
-    // (include both WETH and address(0) for native ETH)
-    const tokenInAddrs = new Set([tokIn]);
-    const tokenOutAddrs = new Set([tokOut]);
-    if (weth && tokIn === weth) tokenInAddrs.add(native);
-    if (weth && tokIn === native) tokenInAddrs.add(weth);
-    if (weth && tokOut === weth) tokenOutAddrs.add(native);
-    if (weth && tokOut === native) tokenOutAddrs.add(weth);
+    // Build localStorage cache key
+    const sortedPair = [tokIn, tokOut].sort().join('-');
+    const cacheKey = `${chainId}-${sortedPair}`;
 
-    // Strategy 1: Scan PoolManager Initialize events for this token pair
-    const cacheKey = `${chainId}-${[...tokenInAddrs].sort().join(',')}-${[...tokenOutAddrs].sort().join(',')}`;
-    let poolKeys = v4PoolKeyCache.get(cacheKey);
-
-    if (!poolKeys) {
-        poolKeys = await scanV4InitializeEvents(ethers, provider, poolManagerAddr, tokenInAddrs, tokenOutAddrs, chainId);
-        v4PoolKeyCache.set(cacheKey, poolKeys);
+    // ─── Check localStorage cache first (instant) ───
+    const cached = loadCachedV4Pools(cacheKey);
+    if (cached && cached.length > 0) {
+        console.log(`V4: ${cached.length} pool(s) from cache`);
+        return cached;
     }
 
-    // For each discovered pool key, verify it has liquidity via the quoter
-    if (poolKeys.length > 0) {
-        console.log(`Found ${poolKeys.length} V4 pool keys via event logs, verifying liquidity...`);
-        const testAmount = 1000000000000000n; // 0.001 ETH
+    // ─── Parallel brute-force: probe all fee/tickSpacing combos at once ───
+    // Standard V3-compatible tiers
+    const feeTickCombos = [
+        { fee: 100, tickSpacing: 1 },
+        { fee: 500, tickSpacing: 10 },
+        { fee: 3000, tickSpacing: 60 },
+        { fee: 10000, tickSpacing: 200 },
+        // Free (fee=0) pools
+        { fee: 0, tickSpacing: 1 },
+        { fee: 0, tickSpacing: 10 },
+        { fee: 0, tickSpacing: 60 },
+        { fee: 0, tickSpacing: 200 },
+        // Dynamic fee (0x800000) pools
+        { fee: 8388608, tickSpacing: 1 },
+        { fee: 8388608, tickSpacing: 10 },
+        { fee: 8388608, tickSpacing: 60 },
+        { fee: 8388608, tickSpacing: 200 },
+        // Non-standard fee tiers seen in the wild
+        { fee: 2000, tickSpacing: 40 },
+        { fee: 5000, tickSpacing: 100 },
+        { fee: 20000, tickSpacing: 400 },
+        { fee: 50000, tickSpacing: 100 },
+        { fee: 50000, tickSpacing: 1000 },
+        { fee: 96000, tickSpacing: 1920 },   // e.g. ELEVATE
+        { fee: 100000, tickSpacing: 200 },
+        { fee: 100000, tickSpacing: 2000 },
+        // Wide tickSpacing variants
+        { fee: 3000, tickSpacing: 1 },
+        { fee: 10000, tickSpacing: 60 },
+        { fee: 500, tickSpacing: 1 },
+        // Dynamic fee with wider tick spacings
+        { fee: 8388608, tickSpacing: 100 },
+        { fee: 8388608, tickSpacing: 400 },
+        { fee: 8388608, tickSpacing: 1000 },
+        { fee: 8388608, tickSpacing: 1920 },
+    ];
 
-        const queries = poolKeys.map(pk =>
-            tryV4Quoter(ethers, provider, quoterAddr, pk.currency0, pk.currency1, pk.fee, pk.tickSpacing, testAmount, tokenIn, tokenOut, pk.hooks)
-        );
-
-        const results = await Promise.allSettled(queries);
-        for (const r of results) {
-            if (r.status === 'fulfilled' && r.value) {
-                pools.push(r.value);
-            }
-        }
+    // Build all token pair variants (include native ETH if applicable)
+    const tokenPairs = [[tokenIn, tokenOut]];
+    if (wethAddr) {
+        if (tokIn === weth) tokenPairs.push([ZERO_ADDRESS, tokenOut]);
+        if (tokOut === weth) tokenPairs.push([tokenIn, ZERO_ADDRESS]);
     }
 
-    // Strategy 2: Brute-force common fee/tickSpacing combos with hooks=0x0
-    // (in case the event scanning missed anything or the pool was created recently)
-    if (pools.length === 0) {
-        const feeTickCombos = [
-            { fee: 100, tickSpacing: 1 },
-            { fee: 500, tickSpacing: 10 },
-            { fee: 3000, tickSpacing: 60 },
-            { fee: 10000, tickSpacing: 200 },
-            { fee: 0, tickSpacing: 1 },
-            { fee: 0, tickSpacing: 10 },
-            { fee: 0, tickSpacing: 60 },
-            { fee: 0, tickSpacing: 200 },
-            { fee: 8388608, tickSpacing: 1 },
-            { fee: 8388608, tickSpacing: 10 },
-            { fee: 8388608, tickSpacing: 60 },
-            { fee: 8388608, tickSpacing: 200 },
-        ];
-
-        const tokenPairs = [[tokenIn, tokenOut]];
-        if (wethAddr) {
-            if (tokIn === weth) tokenPairs.push([ZERO_ADDRESS, tokenOut]);
-            if (tokOut === weth) tokenPairs.push([tokenIn, ZERO_ADDRESS]);
-        }
-
-        const testAmount = 1000000000000000n;
-        const queries = [];
-        for (const [tIn, tOut] of tokenPairs) {
-            for (const { fee, tickSpacing } of feeTickCombos) {
-                queries.push(
-                    tryV4Quoter(ethers, provider, quoterAddr, tIn, tOut, fee, tickSpacing, testAmount, tokenIn, tokenOut)
-                );
-            }
-        }
-
-        const results = await Promise.allSettled(queries);
-        for (const r of results) {
-            if (r.status === 'fulfilled' && r.value) {
-                pools.push(r.value);
-            }
+    // Fire ALL probes in parallel — typically ~24 eth_call RPCs
+    const testAmount = 1000000000000000n; // 0.001 ETH
+    const queries = [];
+    for (const [tIn, tOut] of tokenPairs) {
+        for (const { fee, tickSpacing } of feeTickCombos) {
+            queries.push(
+                tryV4Quoter(ethers, provider, quoterAddr, tIn, tOut, fee, tickSpacing, testAmount, tokenIn, tokenOut)
+            );
         }
     }
 
-    // Deduplicate by fee+tickSpacing+hooks combo
+    const results = await Promise.allSettled(queries);
+    const pools = [];
+    for (const r of results) {
+        if (r.status === 'fulfilled' && r.value) {
+            pools.push(r.value);
+        }
+    }
+
+    // Deduplicate by fee+tickSpacing+hooks+currencies
     const seen = new Set();
     const deduped = pools.filter(p => {
         const key = `${p.fee}-${p.tickSpacing}-${p.currency0}-${p.currency1}-${p.hooks}`;
@@ -400,8 +427,10 @@ async function discoverV4Pools(provider, tokenIn, tokenOut) {
         return true;
     });
 
+    // Save to localStorage for instant future lookups
     if (deduped.length > 0) {
-        console.log(`Found ${deduped.length} V4 pool(s)`);
+        console.log(`V4: found ${deduped.length} pool(s), caching`);
+        saveCachedV4Pools(cacheKey, deduped);
     }
 
     return deduped;
