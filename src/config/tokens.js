@@ -228,6 +228,34 @@ function getWethForChain(chainId) {
 }
 
 /**
+ * Detect if a token pair is a native ↔ wrapped native swap (wrap or unwrap).
+ * Works for any chain: ETH↔WETH, BNB↔WBNB, POL↔WMATIC, AVAX↔WAVAX, etc.
+ *
+ * @param {object} tokenIn
+ * @param {object} tokenOut
+ * @param {number} [chainId]
+ * @returns {{ isWrapUnwrap: boolean, isWrap: boolean, isUnwrap: boolean, wethAddress: string }}
+ */
+export function isWrapUnwrap(tokenIn, tokenOut, chainId = 1) {
+    const wrappedAddr = getWethForChain(chainId).toLowerCase();
+
+    const inIsNative = tokenIn.isNative || tokenIn.address.toLowerCase() === NATIVE_ETH.toLowerCase();
+    const outIsNative = tokenOut.isNative || tokenOut.address.toLowerCase() === NATIVE_ETH.toLowerCase();
+    const inIsWrapped = tokenIn.address.toLowerCase() === wrappedAddr;
+    const outIsWrapped = tokenOut.address.toLowerCase() === wrappedAddr;
+
+    const isWrap = inIsNative && outIsWrapped;   // native → wrapped (deposit)
+    const isUnwrap = inIsWrapped && outIsNative;  // wrapped → native (withdraw)
+
+    return {
+        isWrapUnwrap: isWrap || isUnwrap,
+        isWrap,
+        isUnwrap,
+        wethAddress: getWethForChain(chainId),
+    };
+}
+
+/**
  * Render a token icon HTML string.
  */
 export function renderTokenIcon(token, size = 28) {
@@ -279,7 +307,7 @@ export const CHAIN_TOKENS = {
     ],
 
     137: [ // Polygon
-        { symbol: 'MATIC', name: 'Polygon', address: NATIVE_ETH, decimals: 18, isNative: true, color: '#8247e5', logo: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/polygon/info/logo.png', popular: true },
+        { symbol: 'POL', name: 'Polygon', address: NATIVE_ETH, decimals: 18, isNative: true, color: '#8247e5', logo: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/polygon/info/logo.png', popular: true },
         T('USDC', 'USD Coin', '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359', 6, '#2775ca', 'polygon'),
         T('USDT', 'Tether USD', '0xc2132D05D31c914a87C6611C10748AEb04B58e8F', 6, '#26a17b', 'polygon'),
         T('WBTC', 'Wrapped BTC', '0x1BFD67037B42Cf73acF2047067bd4F2C47D9BfD6', 8, '#f09242', 'polygon'),

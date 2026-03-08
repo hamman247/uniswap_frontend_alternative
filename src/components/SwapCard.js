@@ -4,18 +4,19 @@
 import { ICONS } from './icons.js';
 import { TOKENS, getTokenBySymbol, renderTokenIcon } from '../config/tokens.js';
 import { feeManager } from '../fees/feeManager.js';
-import { findOptimalRoute, generateDemoRoute } from '../routing/optimizer.js';
+import { findOptimalRoute } from '../routing/optimizer.js';
 import { discoverPools } from '../routing/poolDiscovery.js';
 import { getCachedBalance } from '../utils/balances.js';
 import { estimateGasCostUsd } from '../utils/gasOracle.js';
 
 export class SwapCard {
-  constructor({ onSwap, onSelectToken, onOpenSettings, routeVisualizer, getProvider }) {
+  constructor({ onSwap, onSelectToken, onOpenSettings, routeVisualizer, getProvider, getSlippage }) {
     this.onSwap = onSwap;
     this.onSelectToken = onSelectToken;
     this.onOpenSettings = onOpenSettings;
     this.routeVisualizer = routeVisualizer;
     this.getProvider = getProvider; // () => provider | null
+    this.getSlippage = getSlippage; // () => slippage percentage (e.g. 0.5)
 
     this.tokenIn = getTokenBySymbol('ETH');
     this.tokenOut = getTokenBySymbol('WISE');
@@ -299,7 +300,58 @@ export class SwapCard {
       const amountInNum = parseFloat(this.amountIn);
       const rawAmountIn = BigInt(Math.floor(amountInNum * (10 ** this.tokenIn.decimals)));
 
-      const provider = this.getProvider ? this.getProvider() : null;
+      // ─── Wrap/Unwrap detection ───
+      // If the pair is native ↔ wrapped (ETH↔WETH, BNB↔WBNB, etc.),
+      // return a 1:1 route instantly — no pool discovery needed.
+      const { getCurrentChainId } = await import('../config/contracts.js');
+      const { isWrapUnwrap } = await import('../config/tokens.js');
+      const chainId = getCurrentChainId();
+      const wrapCheck = isWrapUnwrap(this.tokenIn, this.tokenOut, chainId);
+
+      if (wrapCheck.isWrapUnwrap) {
+        const action = wrapCheck.isWrap ? 'Wrap' : 'Unwrap';
+        const route = {
+          routes: [{
+            pool: { version: 'WRAP', fee: 0, feeLabel: '0%', tokenIn: this.tokenIn.address, tokenOut: this.tokenOut.address },
+            amountIn: rawAmountIn,
+            amountOut: rawAmountIn, // 1:1 ratio
+            percentage: 100,
+            priceImpact: 0,
+            gasEstimate: 45000,
+          }],
+          totalAmountIn: rawAmountIn,
+          totalAmountAfterFee: rawAmountIn,
+          totalAmountOut: rawAmountIn, // 1:1
+          feeAmount: 0n,
+          priceImpact: 0,
+          totalGas: 45000,
+          effectivePrice: '1.00000',
+          isWrapUnwrap: true,
+        };
+
+        this.currentRoute = route;
+        this.amountOut = amountInNum.toFixed(this.tokenOut.decimals <= 6 ? 2 : 6);
+        this.element.querySelector('#amount-input-out').value = this._formatAmountDisplay(amountInNum);
+        this._updateInfoSection(route, amountInNum, amountInNum);
+        if (this.routeVisualizer) this.routeVisualizer.update(route);
+
+        const walletProvider = this.getProvider ? this.getProvider() : null;
+        this._updateSubmitButton(walletProvider ? 'ready' : 'ready', walletProvider ? action : `Connect Wallet to ${action}`);
+        this.isLoading = false;
+        return;
+      }
+
+      // Use wallet provider if connected, otherwise use public RPC
+      let provider = this.getProvider ? this.getProvider() : null;
+      let isReadOnly = false;
+
+      if (!provider) {
+        // No wallet — use public RPC for read-only price discovery
+        const { getPublicProvider } = await import('../utils/publicProvider.js');
+        provider = await getPublicProvider();
+        isReadOnly = true;
+      }
+
       let route;
 
       if (provider) {
@@ -308,16 +360,21 @@ export class SwapCard {
         const pools = await discoverPools(provider, this.tokenIn, this.tokenOut);
 
         if (pools.length === 0) {
-          // No on-chain pools found — fall back to demo
-          console.warn('No pools found on-chain, using simulated route');
-          route = generateDemoRoute(this.tokenIn, this.tokenOut, rawAmountIn, this.tokenIn.decimals, this.tokenOut.decimals);
+          this._updateSubmitButton('disabled', 'No path found for token trading');
+          this._clearOutput();
+          this.isLoading = false;
+          return;
         } else {
           this._updateSubmitButton('loading', `Optimizing across ${pools.length} pools...`);
           route = await findOptimalRoute(provider, pools, rawAmountIn, this.tokenIn.decimals, this.tokenOut.decimals);
         }
       } else {
-        // == DEMO MODE: no wallet connected ==
-        route = generateDemoRoute(this.tokenIn, this.tokenOut, rawAmountIn, this.tokenIn.decimals, this.tokenOut.decimals);
+        // == FALLBACK: both wallet and public RPC unavailable ==
+        console.warn('No provider available');
+        this._updateSubmitButton('disabled', 'Unable to connect to network');
+        this._clearOutput();
+        this.isLoading = false;
+        return;
       }
 
       this.currentRoute = route;
@@ -340,8 +397,11 @@ export class SwapCard {
       if (this.routeVisualizer) this.routeVisualizer.update(route);
 
       // Update submit button
-      const modeLabel = provider ? '' : ' (simulated)';
-      this._updateSubmitButton('ready', `Swap${modeLabel}`);
+      if (isReadOnly) {
+        this._updateSubmitButton('ready', 'Connect Wallet to Swap');
+      } else {
+        this._updateSubmitButton('ready', 'Swap');
+      }
     } catch (error) {
       console.error('Route calculation error:', error);
       this._updateSubmitButton('disabled', 'Error calculating route');
@@ -360,9 +420,14 @@ export class SwapCard {
       `1 ${this.tokenIn.symbol} = ${this._formatAmountDisplay(rate)} ${this.tokenOut.symbol}`;
 
     // Fee
+    const feeBps = feeManager.feeBps;
     const { feeHuman } = feeManager.calculateFeeHuman(amountInNum, this.tokenIn.decimals);
-    this.element.querySelector('#swap-fee').textContent =
-      `${this._formatAmountDisplay(feeHuman)} ${this.tokenIn.symbol} (0.05%)`;
+    if (Number(feeBps) > 0) {
+      this.element.querySelector('#swap-fee').textContent =
+        `${this._formatAmountDisplay(feeHuman)} ${this.tokenIn.symbol} (${feeManager.getFeePercentage()})`;
+    } else {
+      this.element.querySelector('#swap-fee').textContent = 'None';
+    }
 
     // Price impact
     const impactEl = this.element.querySelector('#swap-impact');
@@ -370,8 +435,9 @@ export class SwapCard {
     impactEl.textContent = `${impact.toFixed(2)}%`;
     impactEl.className = 'swap-info-value' + (impact < 1 ? ' positive' : impact > 5 ? ' danger' : '');
 
-    // Min received (with 0.5% default slippage)
-    const slippage = 0.005;
+    // Min received (uses user's slippage tolerance from settings)
+    const slippagePct = this.getSlippage ? this.getSlippage() : 0.5;
+    const slippage = slippagePct / 100;
     const minReceived = amountOutNum * (1 - slippage);
     this.element.querySelector('#swap-min-received').textContent =
       `${this._formatAmountDisplay(minReceived)} ${this.tokenOut.symbol}`;

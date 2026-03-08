@@ -14,8 +14,6 @@
 import { getQuote, getQuotesForPools } from './quoter.js';
 import { feeManager } from '../fees/feeManager.js';
 import { getGasPrice } from '../utils/gasOracle.js';
-import { getCurrentChainId } from '../config/contracts.js';
-import { chainSupportsVersion } from '../config/chains.js';
 
 const NUM_CHUNKS = 20; // Split trade into 20 chunks for optimization granularity
 
@@ -254,101 +252,4 @@ function calculateEffectivePrice(amountIn, amountOut, decimalsIn, decimalsOut) {
     const outFloat = Number(amountOut) / (10 ** decimalsOut);
     if (inFloat === 0) return '0';
     return (outFloat / inFloat).toPrecision(6);
-}
-
-/**
- * Demo/simulation route when no wallet is connected.
- * Generates a realistic-looking route result using hardcoded prices.
- */
-export function generateDemoRoute(tokenIn, tokenOut, amountIn, decimalsIn, decimalsOut) {
-    const amountInNum = Number(amountIn) / (10 ** decimalsIn);
-    const { feeHuman, amountAfterFeeHuman } = feeManager.calculateFeeHuman(amountInNum, decimalsIn);
-    const feeAmount = BigInt(Math.floor(feeHuman * (10 ** decimalsIn)));
-
-    const prices = generateDemoPrices(tokenIn.symbol, tokenOut.symbol);
-    const totalOutputNum = amountAfterFeeHuman * prices.rate;
-    const totalAmountOut = BigInt(Math.floor(totalOutputNum * (10 ** decimalsOut)));
-
-    const routes = [];
-    for (const split of prices.splits) {
-        const splitAmount = BigInt(Math.floor(amountAfterFeeHuman * (split.pct / 100) * (10 ** decimalsIn)));
-        const splitOutput = BigInt(Math.floor(totalOutputNum * (split.pct / 100) * (10 ** decimalsOut)));
-
-        routes.push({
-            pool: {
-                version: split.version,
-                fee: split.fee,
-                feeLabel: `${(split.fee / 10000).toFixed(2)}%`,
-                tokenIn: tokenIn.address,
-                tokenOut: tokenOut.address,
-            },
-            amountIn: splitAmount,
-            amountOut: splitOutput,
-            percentage: split.pct,
-            priceImpact: split.impact,
-            gasEstimate: split.gas,
-        });
-    }
-
-    return {
-        routes,
-        totalAmountIn: amountIn,
-        totalAmountAfterFee: amountIn - feeAmount,
-        totalAmountOut,
-        feeAmount,
-        priceImpact: 0.12,
-        totalGas: routes.reduce((s, r) => s + r.gasEstimate, 0),
-        effectivePrice: prices.rate.toPrecision(6),
-    };
-}
-
-function generateDemoPrices(symbolIn, symbolOut) {
-    const prices = {
-        ETH: 3150, WETH: 3150,
-        WBTC: 95000, BTCB: 95000,
-        UNI: 12.5, LINK: 18.7,
-        AAVE: 210, MKR: 1850,
-        USDC: 1, USDT: 1, DAI: 1, USDB: 1,
-        SNX: 2.8, COMP: 52, CRV: 0.62, LDO: 1.95, WISE: 0.067,
-        MATIC: 0.40, POL: 0.40,
-        BNB: 600, CAKE: 2.50,
-        AVAX: 35, CELO: 0.55, cUSD: 1, cEUR: 1.08,
-        ARB: 0.90, OP: 1.80,
-        BLAST: 0.02,
-        WLD: 1.80, AERO: 0.95,
-        cbETH: 3300,
-    };
-
-    const priceIn = prices[symbolIn] || 1;
-    const priceOut = prices[symbolOut] || 1;
-    const rate = priceIn / priceOut;
-
-    // Import chain support check
-    let allSplits = [
-        { version: 'V3', fee: 3000, pct: 55, impact: 0.08, gas: 184000 },
-        { version: 'V3', fee: 500, pct: 25, impact: 0.04, gas: 184000 },
-        { version: 'V2', fee: 3000, pct: 12, impact: 0.15, gas: 150000 },
-        { version: 'V4', fee: 3000, pct: 8, impact: 0.03, gas: 200000 },
-    ];
-
-    // Filter splits by chain support
-    try {
-        const chainId = getCurrentChainId();
-        allSplits = allSplits.filter(s => chainSupportsVersion(chainId, s.version));
-    } catch {
-        // If imports fail, keep all splits
-    }
-
-    // Re-distribute percentages across remaining splits
-    if (allSplits.length > 0) {
-        const totalPct = allSplits.reduce((s, sp) => s + sp.pct, 0);
-        allSplits.forEach(sp => {
-            sp.pct = Math.round((sp.pct / totalPct) * 100);
-        });
-        // Fix rounding so sum = 100
-        const diff = 100 - allSplits.reduce((s, sp) => s + sp.pct, 0);
-        allSplits[0].pct += diff;
-    }
-
-    return { rate, splits: allSplits };
 }

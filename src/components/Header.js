@@ -1,7 +1,6 @@
 /**
  * Header Component — Logo, navigation, chain selector, and wallet
  */
-import { ICONS } from './icons.js';
 import { getVisibleChains, getChain, CHAINS } from '../config/chains.js';
 
 export class Header {
@@ -20,7 +19,7 @@ export class Header {
     header.className = 'header';
     header.innerHTML = `
       <a class="header-logo" href="/">
-        ${ICONS.logo}
+        <img src="/owl-logo.jpg" alt="OwlSwap" class="header-logo-img" />
         <span class="header-logo-text">OwlSwap</span>
       </a>
 

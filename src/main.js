@@ -57,6 +57,7 @@ class App {
             onOpenSettings: () => this.settings.toggle(),
             routeVisualizer: this.routeVisualizer,
             getProvider: () => walletConnect.provider || null,
+            getSlippage: () => this.settingsValues.slippage,
         });
 
         // ─── Settings ───

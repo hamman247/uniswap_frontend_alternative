@@ -7,8 +7,14 @@
  * the network and uses that instead.
  */
 import { UNISWAP_V2, UNISWAP_V3, UNISWAP_V4, ERC20_ABI, getCurrentChainId, getGasConfig } from '../config/contracts.js';
-import { NATIVE_ETH, WETH_ADDRESS, getRoutingAddress } from '../config/tokens.js';
+import { NATIVE_ETH, WETH_ADDRESS, getRoutingAddress, isWrapUnwrap } from '../config/tokens.js';
 import { feeManager } from '../fees/feeManager.js';
+
+// ─── WETH ABI for wrap/unwrap ───
+const WETH_ABI = [
+    'function deposit() payable',
+    'function withdraw(uint256 wad)',
+];
 
 /**
  * Build EIP-1559 gas overrides from live network data.
@@ -71,6 +77,30 @@ async function buildGasOverrides(provider) {
 }
 
 /**
+ * Execute a native ↔ wrapped native wrap or unwrap.
+ * Calls WETH.deposit() for wrapping or WETH.withdraw() for unwrapping.
+ *
+ * @param {import('ethers').Signer} signer
+ * @param {bigint} amount — amount to wrap or unwrap
+ * @param {boolean} isWrap — true = native→wrapped (deposit), false = wrapped→native (withdraw)
+ * @param {string} wethAddress — the WETH contract address on this chain
+ * @returns {Promise<import('ethers').TransactionResponse>}
+ */
+export async function executeWrapUnwrap(signer, amount, isWrap, wethAddress) {
+    const { ethers } = await import('ethers');
+    const weth = new ethers.Contract(wethAddress, WETH_ABI, signer);
+    const gasOverrides = await buildGasOverrides(signer.provider);
+
+    if (isWrap) {
+        console.log(`Wrapping ${Number(amount) / 1e18} native → WETH`);
+        return weth.deposit({ value: amount, ...gasOverrides });
+    } else {
+        console.log(`Unwrapping ${Number(amount) / 1e18} WETH → native`);
+        return weth.withdraw(amount, gasOverrides);
+    }
+}
+
+/**
  * Execute the optimized route
  * @param {import('ethers').Signer} signer — connected wallet signer
  * @param {object} routeResult — from optimizer
@@ -82,6 +112,20 @@ async function buildGasOverrides(provider) {
  */
 export async function executeRoute(signer, routeResult, tokenIn, tokenOut, slippageBps = 50, deadlineMinutes = 20) {
     const { ethers } = await import('ethers');
+
+    // Check for wrap/unwrap — bypass pool routing entirely
+    const chainId = getCurrentChainId();
+    const wrapCheck = isWrapUnwrap(tokenIn, tokenOut, chainId);
+    if (wrapCheck.isWrapUnwrap) {
+        const tx = await executeWrapUnwrap(
+            signer,
+            routeResult.totalAmountIn,
+            wrapCheck.isWrap,
+            wrapCheck.wethAddress
+        );
+        return [tx];
+    }
+
     const deadline = Math.floor(Date.now() / 1000) + deadlineMinutes * 60;
 
     // Fetch live gas params once for all legs

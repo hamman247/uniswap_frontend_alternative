@@ -7,7 +7,7 @@ const Q96 = 2n ** 96n;
 const Q192 = Q96 * Q96;
 
 /**
- * Get a quote from a specific pool
+ * Get a quote from a specific pool (direct or multi-hop)
  * @param {import('ethers').Provider} provider
  * @param {object} pool — pool descriptor from poolDiscovery
  * @param {bigint} amountIn — raw amount in wei
@@ -16,6 +16,11 @@ const Q192 = Q96 * Q96;
  * @returns {Promise<{ amountOut: bigint, priceImpact: number, gasEstimate: number }>}
  */
 export async function getQuote(provider, pool, amountIn, decimalsIn, decimalsOut) {
+    // Multi-hop: quote leg1, then use output as input for leg2
+    if (pool.isMultiHop) {
+        return getMultiHopQuote(provider, pool, amountIn);
+    }
+
     switch (pool.version) {
         case 'V2':
             return getV2Quote(pool, amountIn);
@@ -26,6 +31,30 @@ export async function getQuote(provider, pool, amountIn, decimalsIn, decimalsOut
         default:
             throw new Error(`Unknown pool version: ${pool.version}`);
     }
+}
+
+/**
+ * Multi-hop quote: tokenIn → intermediary → tokenOut
+ * Quotes leg1 first, then feeds the output into leg2.
+ */
+async function getMultiHopQuote(provider, pool, amountIn) {
+    // Leg 1: tokenIn → intermediary
+    const leg1Quote = await getQuote(provider, pool.leg1, amountIn);
+    if (leg1Quote.amountOut === 0n) {
+        return { amountOut: 0n, priceImpact: 100, gasEstimate: pool.gasEstimate };
+    }
+
+    // Leg 2: intermediary → tokenOut (using leg1's output as input)
+    const leg2Quote = await getQuote(provider, pool.leg2, leg1Quote.amountOut);
+
+    // Combined price impact: 1 - (1 - impact1) * (1 - impact2)
+    const combinedImpact = 1 - (1 - leg1Quote.priceImpact / 100) * (1 - leg2Quote.priceImpact / 100);
+
+    return {
+        amountOut: leg2Quote.amountOut,
+        priceImpact: Math.round(combinedImpact * 10000) / 100,
+        gasEstimate: leg1Quote.gasEstimate + leg2Quote.gasEstimate,
+    };
 }
 
 /**

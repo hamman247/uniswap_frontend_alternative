@@ -197,9 +197,11 @@ body::before {
   text-decoration: none;
 }
 
-.header-logo svg {
+.header-logo-img {
   width: 36px;
   height: 36px;
+  border-radius: var(--radius-lg);
+  object-fit: contain;
 }
 
 .header-logo-text {
