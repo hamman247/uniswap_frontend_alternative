@@ -222,6 +222,7 @@ function getWethForChain(chainId) {
         42220: '0x471EcE3750Da237f93B8E339c536989b8978a438',
         7777777: '0x4200000000000000000000000000000000000006',
         480: '0x4200000000000000000000000000000000000006',
+        369: '0xA1077a294dDE1B09bB078844df40758a5D0f9a27', // WPLS
         11155111: '0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14',
     };
     return wethMap[chainId] || WETH_ADDRESS;
@@ -365,6 +366,18 @@ export const CHAIN_TOKENS = {
     480: [ // World Chain
         N('ETH', 'Ether', 18, '#627eea'),
         T('WLD', 'Worldcoin', '0x2cFc85d8E48F8EAB294be644d9E25C3030863003', 18, '#00c3b6', 'worldchain'),
+    ],
+
+    369: [ // PulseChain — default pair: PLS → WISE
+        { symbol: 'PLS', name: 'Pulse', address: NATIVE_ETH, decimals: 18, isNative: true, color: '#00ff88', logo: 'https://tokens.app.pulsex.com/images/tokens/0xA1077a294dDE1B09bB078844df40758a5D0f9a27.png', popular: true },
+        T('WISE', 'Wise Token', '0x66a0f676479Cee1d7373f3DC2e2952778BfF5bd6', 18, '#4092e0', 'ethereum'),
+        T('WPLS', 'Wrapped Pulse', '0xA1077a294dDE1B09bB078844df40758a5D0f9a27', 18, '#00ff88', 'ethereum'),
+        T('DAI', 'Dai from Ethereum', '0xefD766cCb38EaF1dfd701853BFCe31359239F305', 18, '#f5ac37', 'ethereum'),
+        T('USDC', 'USD Coin from Ethereum', '0x15D38573d2feeb82e7ad5187aB8c1D52810B1f07', 6, '#2775ca', 'ethereum'),
+        T('USDT', 'Tether from Ethereum', '0x0Cb6F5a34ad42ec934882A05265A7d5F59b51A2f', 6, '#26a17b', 'ethereum'),
+        T('PLSX', 'PulseX', '0x95B303987A60C71504D99Aa1b13B4DA07b0790ab', 18, '#ff007a', 'ethereum'),
+        T('HEX', 'HEX', '0x2b591e99afE9f32eAA6214f7B7629768c40Eeb39', 8, '#ff3366', 'ethereum'),
+        T('INC', 'Incentive', '0x2fa878Ab3F87CC1C9737Fc071108F904c0B0C95d', 18, '#9b59b6', 'ethereum'),
     ],
 
     11155111: [ // Sepolia testnet

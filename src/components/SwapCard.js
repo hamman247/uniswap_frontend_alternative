@@ -486,6 +486,23 @@ export class SwapCard {
     if (this.routeVisualizer) this.routeVisualizer.hide();
   }
 
+  /**
+   * Clear all input/output fields — used when switching chains
+   */
+  clearFields() {
+    this.amountIn = '';
+    this.amountOut = '';
+    this.currentRoute = null;
+    if (this.debounceTimer) clearTimeout(this.debounceTimer);
+    this.element.querySelector('#amount-input-in').value = '';
+    this.element.querySelector('#amount-input-out').value = '';
+    this.element.querySelector('#swap-info').style.display = 'none';
+    this.element.querySelector('#usd-value-in').textContent = '';
+    this.element.querySelector('#usd-value-out').textContent = '';
+    this._updateSubmitButton('disabled', t('enterAmount'));
+    if (this.routeVisualizer) this.routeVisualizer.hide();
+  }
+
   _showBalanceError() {
     // Brief red flash on the submit button
     this._updateSubmitButton('disabled', t('balanceNotEnough'));

@@ -221,10 +221,11 @@ class App {
         clearBalanceCache();
         clearGasPriceCache();
 
-        // Update swap card with new chain's default tokens
+        // Update swap card with new chain's default tokens and clear fields
         const { tokenIn, tokenOut } = getDefaultPair(chainId);
         this.swapCard.setToken('in', tokenIn);
         this.swapCard.setToken('out', tokenOut);
+        this.swapCard.clearFields();
 
         // Update token modal's list for new chain
         if (this.tokenModal) {

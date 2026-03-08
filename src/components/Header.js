@@ -57,14 +57,39 @@ export class Header {
 
   _renderChainList() {
     const chains = getVisibleChains(this.showTestnets);
-    return chains.map(chain => `
+    return chains.map(chain => {
+      const logoUrl = this._getChainLogo(chain);
+      return `
       <button class="chain-option ${chain.chainId === this.currentChainId ? 'active' : ''} ${chain.isTestnet ? 'testnet' : ''}"
               data-chain-id="${chain.chainId}">
-        <span class="chain-dot" style="background: ${chain.color}"></span>
+        <img class="chain-option-logo" src="${logoUrl}" alt="${chain.shortName}"
+             onerror="this.style.display='none';this.nextElementSibling.style.display='inline-block';" />
+        <span class="chain-dot chain-dot-fallback" style="background: ${chain.color}; display: none;"></span>
         <span class="chain-option-name">${chain.name}</span>
         ${chain.isTestnet ? '<span class="chain-testnet-badge">Testnet</span>' : ''}
       </button>
-    `).join('');
+    `;
+    }).join('');
+  }
+
+  _getChainLogo(chain) {
+    const logos = {
+      1: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/info/logo.png',
+      42161: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/arbitrum/info/logo.png',
+      10: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/optimism/info/logo.png',
+      137: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/polygon/info/logo.png',
+      8453: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/base/info/logo.png',
+      56: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/binance/info/logo.png',
+      43114: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/avalanchec/info/logo.png',
+      81457: 'https://icons.llamao.fi/icons/chains/rsz_blast.jpg',
+      324: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/zksync/info/logo.png',
+      42220: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/celo/info/logo.png',
+      7777777: 'https://icons.llamao.fi/icons/chains/rsz_zora.jpg',
+      480: 'https://icons.llamao.fi/icons/chains/rsz_worldchain.jpg',
+      369: 'https://tokens.app.pulsex.com/images/tokens/0xA1077a294dDE1B09bB078844df40758a5D0f9a27.png',
+      11155111: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/info/logo.png',
+    };
+    return logos[chain.chainId] || '';
   }
 
   _bindEvents() {

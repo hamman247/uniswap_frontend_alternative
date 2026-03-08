@@ -294,6 +294,29 @@ export const CHAINS = {
         versions: ['V3'],
     },
 
+    369: {
+        chainId: 369,
+        name: 'PulseChain',
+        shortName: 'PLS',
+        isTestnet: false,
+        nativeCurrency: { name: 'Pulse', symbol: 'PLS', decimals: 18 },
+        rpcUrl: 'https://rpc.pulsechain.com',
+        blockExplorer: 'https://scan.pulsechain.com',
+        color: '#00ff88',
+        wethAddress: '0xA1077a294dDE1B09bB078844df40758a5D0f9a27', // WPLS
+        contracts: {
+            v2Factory: '0x29eA7545DEf87022BAdc76323F373EA1e707C523', // PulseX V2
+            v2Router: '0x165C3410fC91EF562C50559f7d2289fEbed552d9',  // PulseX V2
+            v3Factory: null,
+            v3Router: null,
+            v3QuoterV2: null,
+            v4PoolManager: null,
+            v4UniversalRouter: null,
+        },
+        gasConfig: { minTipWei: 1_000_000_000n, maxTipWei: 50_000_000_000n }, // PulseChain gas
+        versions: ['V2'],
+    },
+
     // ═══════════════════ Testnets ═══════════════════
 
     11155111: {
