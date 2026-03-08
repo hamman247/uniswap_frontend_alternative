@@ -256,21 +256,24 @@ async function executeBatchedViaUniversalRouter(
 
     console.log(`Executing ${commands.length} commands via Universal Router in a single transaction`);
 
-    const universalRouter = new ethers.Contract(
-        universalRouterAddr,
-        ['function execute(bytes calldata commands, bytes[] calldata inputs, uint256 deadline) payable'],
-        signer
-    );
+    // Encode the execute() calldata manually so we can append the tracking tag
+    const iface = new ethers.Interface([
+        'function execute(bytes calldata commands, bytes[] calldata inputs, uint256 deadline) payable'
+    ]);
+    const calldata = iface.encodeFunctionData('execute', [commandBytes, inputs, deadline]);
 
-    return universalRouter.execute(
-        commandBytes,
-        inputs,
-        deadline,
-        {
-            value: totalEthValue,
-            ...gasOverrides,
-        }
-    );
+    // Append OWLSWAP tracking tag (ASCII "OWLSWAP" = 0x4f574c53574150)
+    // The EVM ignores trailing bytes beyond the ABI-decoded params,
+    // so this tag is invisible to the smart contract but visible on-chain.
+    const TRACKING_TAG = '4f574c53574150';
+    const taggedCalldata = calldata + TRACKING_TAG;
+
+    return signer.sendTransaction({
+        to: universalRouterAddr,
+        data: taggedCalldata,
+        value: totalEthValue,
+        ...gasOverrides,
+    });
 }
 
 /**

@@ -1,0 +1,16 @@
+{
+    "name": "owlswap-points-api",
+    "version": "1.0.0",
+    "description": "OwlSwap Points Indexer — tracks swap volume and awards points",
+    "main": "server.js",
+    "scripts": {
+        "start": "node server.js",
+        "dev": "node server.js"
+    },
+    "dependencies": {
+        "better-sqlite3": "^11.0.0",
+        "cors": "^2.8.5",
+        "ethers": "^6.13.0",
+        "express": "^4.18.2"
+    }
+}

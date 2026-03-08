@@ -4,9 +4,11 @@
 import { getVisibleChains, getChain, CHAINS } from '../config/chains.js';
 
 export class Header {
-  constructor({ onConnectWallet, onChainSelect }) {
+  constructor({ onConnectWallet, onChainSelect, onNavSwap, onNavLeaderboard }) {
     this.onConnectWallet = onConnectWallet;
     this.onChainSelect = onChainSelect;
+    this.onNavSwap = onNavSwap;
+    this.onNavLeaderboard = onNavLeaderboard;
     this.walletAddress = null;
     this.currentChainId = 1;
     this.showTestnets = localStorage.getItem('owlswap_testnets') === 'true';
@@ -25,10 +27,12 @@ export class Header {
 
       <nav class="header-nav">
         <button class="header-nav-item active" id="nav-swap">Swap</button>
+        <button class="header-nav-item" id="nav-leaderboard">Leaderboard</button>
         <a class="header-nav-item" href="https://app.uniswap.org/positions/create?currencyA=NATIVE&currencyB=0x66a0f676479Cee1d7373f3DC2e2952778BfF5bd6&chain=ethereum&fee={%22isDynamic%22:false,%22feeAmount%22:100,%22tickSpacing%22:1}&hook=undefined&priceRangeState={%22priceInverted%22:false,%22fullRange%22:false,%22initialPrice%22:%22%22,%22inputMode%22:%22price%22}&depositState={%22exactField%22:%22TOKEN0%22,%22exactAmounts%22:{}}&step=0" target="_blank" rel="noopener noreferrer">Pools</a>
       </nav>
 
       <div class="header-actions">
+        <div id="points-container"></div>
         <div class="chain-selector" id="chain-selector">
           <button class="chain-selector-btn" id="chain-selector-btn">
             <span class="chain-dot" id="chain-dot" style="background: ${CHAINS[this.currentChainId]?.color || '#627eea'}"></span>
@@ -68,6 +72,18 @@ export class Header {
     // Wallet connect
     this.element.querySelector('#wallet-connect-btn').addEventListener('click', () => {
       if (this.onConnectWallet) this.onConnectWallet();
+    });
+
+    // Nav: Swap
+    this.element.querySelector('#nav-swap')?.addEventListener('click', () => {
+      this._setActiveNav('nav-swap');
+      this.onNavSwap?.();
+    });
+
+    // Nav: Leaderboard
+    this.element.querySelector('#nav-leaderboard')?.addEventListener('click', () => {
+      this._setActiveNav('nav-leaderboard');
+      this.onNavLeaderboard?.();
     });
 
     // Chain selector toggle
@@ -112,6 +128,12 @@ export class Header {
 
       if (this.onChainSelect) this.onChainSelect(chainId);
     }
+  }
+
+  _setActiveNav(activeId) {
+    this.element?.querySelectorAll('.header-nav-item').forEach(item => {
+      item.classList.toggle('active', item.id === activeId);
+    });
   }
 
   /** Refresh chain list when testnet visibility changes */
