@@ -1,7 +1,7 @@
 /**
  * Quoter — gets price quotes from V2, V3, and V4 pools
  */
-import { UNISWAP_V2, UNISWAP_V3 } from '../config/contracts.js';
+import { UNISWAP_V2, UNISWAP_V3, UNISWAP_V4 } from '../config/contracts.js';
 
 const Q96 = 2n ** 96n;
 const Q192 = Q96 * Q96;
@@ -21,15 +21,80 @@ export async function getQuote(provider, pool, amountIn, decimalsIn, decimalsOut
         return getMultiHopQuote(provider, pool, amountIn);
     }
 
+    // API-discovered pools: use the Uniswap Routing API for quoting
+    if (pool.useApiQuote) {
+        return getApiQuote(pool, amountIn);
+    }
+
     switch (pool.version) {
         case 'V2':
             return getV2Quote(pool, amountIn);
         case 'V3':
             return getV3Quote(provider, pool, amountIn);
         case 'V4':
-            return getV4Quote(pool, amountIn);
+            return getV4Quote(provider, pool, amountIn);
         default:
             throw new Error(`Unknown pool version: ${pool.version}`);
+    }
+}
+
+/**
+ * Get a quote from the Uniswap Routing API.
+ * Used for pools discovered via the API (e.g. V4 pools with custom hooks).
+ */
+async function getApiQuote(pool, amountIn) {
+    try {
+        const { getCurrentChainId } = await import('../config/contracts.js');
+        const chainId = getCurrentChainId();
+
+        const tokenIn = pool.tokenIn === 'NATIVE' ? '0x0000000000000000000000000000000000000000' : pool.tokenIn;
+        const tokenOut = pool.tokenOut === 'NATIVE' ? '0x0000000000000000000000000000000000000000' : pool.tokenOut;
+
+        const requestBody = {
+            tokenInChainId: chainId,
+            tokenOutChainId: chainId,
+            tokenIn,
+            tokenOut,
+            amount: amountIn.toString(),
+            type: 'EXACT_INPUT',
+            configs: [
+                { routingType: 'CLASSIC', protocols: ['V2', 'V3', 'MIXED'] },
+                { routingType: 'DUTCH_V2' },
+            ],
+        };
+
+        const response = await fetch('/api/uniswap/v2/quote', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestBody),
+        });
+
+        if (!response.ok) {
+            console.warn('Uniswap API quote returned', response.status);
+            return getV3QuoteMath(pool, amountIn); // fallback
+        }
+
+        const data = await response.json();
+        const classic = data.quote || data;
+
+        if (classic.quoteDecimals && classic.quote) {
+            const amountOut = BigInt(classic.quote);
+            const priceImpact = parseFloat(classic.priceImpact || '0');
+            const gasEstimate = Number(classic.gasUseEstimate || pool.gasEstimate);
+
+            return {
+                amountOut,
+                priceImpact: Math.round(Math.abs(priceImpact) * 100) / 100,
+                gasEstimate,
+            };
+        }
+
+        return getV3QuoteMath(pool, amountIn);
+    } catch (e) {
+        console.warn('API quote failed:', e.message);
+        return getV3QuoteMath(pool, amountIn);
     }
 }
 
@@ -189,10 +254,57 @@ function getV3QuoteMath(pool, amountIn) {
 }
 
 /**
- * V4 Quote — similar math to V3 (same AMM model)
+ * V4 Quote — uses the V4 Quoter contract via raw eth_call for accurate quotes.
+ * Raw provider.call() bypasses ethers v6 ENS resolution (UNCONFIGURED_NAME errors).
+ * Falls back to math-based estimation if the quoter call fails.
  */
-function getV4Quote(pool, amountIn) {
-    // V4 uses the same concentrated liquidity math as V3
+async function getV4Quote(provider, pool, amountIn) {
+    const quoterAddr = pool.quoterAddr || UNISWAP_V4.quoter;
+
+    if (quoterAddr && pool.useV4Quoter) {
+        try {
+            const { ethers } = await import('ethers');
+            const abiCoder = ethers.AbiCoder.defaultAbiCoder();
+
+            // V4 Quoter quoteExactInputSingle(QuoteExactSingleParams)
+            // QuoteExactSingleParams = (PoolKey poolKey, bool zeroForOne, uint128 exactAmount, bytes hookData)
+            // Function selector: 0xaa9d21cb
+            const encodedParams = abiCoder.encode(
+                ['tuple(tuple(address,address,uint24,int24,address),bool,uint128,bytes)'],
+                [[
+                    [pool.currency0, pool.currency1, pool.fee, pool.tickSpacing, pool.hooks],
+                    pool.isToken0In,
+                    amountIn,
+                    '0x', // hookData
+                ]]
+            );
+
+            const calldata = '0xaa9d21cb' + encodedParams.slice(2);
+
+            const result = await provider.call({
+                to: quoterAddr,
+                data: calldata,
+            });
+
+            if (!result || result === '0x') {
+                return getV3QuoteMath(pool, amountIn);
+            }
+
+            // Decode result: (uint256 amountOut, uint256 gasEstimate)
+            const decoded = abiCoder.decode(['uint256', 'uint256'], result);
+            const amountOut = decoded[0];
+
+            return {
+                amountOut,
+                priceImpact: 0, // V4 quoter doesn't return price impact directly
+                gasEstimate: Number(decoded[1]) || pool.gasEstimate,
+            };
+        } catch (e) {
+            console.warn('V4 Quoter call failed, falling back to math:', e.message);
+        }
+    }
+
+    // Fallback: use V3-style math (same concentrated liquidity model)
     return getV3QuoteMath(pool, amountIn);
 }
 

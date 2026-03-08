@@ -12,6 +12,9 @@ const providerCache = new Map();
  * Get a read-only provider for the given chain (or current chain).
  * Returns null if the chain has no RPC URL configured.
  *
+ * Note: ENS is explicitly disabled to avoid UNCONFIGURED_NAME errors
+ * on public RPCs that don't support ENS resolution.
+ *
  * @param {number} [chainId] — defaults to the current chain
  * @returns {Promise<import('ethers').JsonRpcProvider | null>}
  */
@@ -26,10 +29,21 @@ export async function getPublicProvider(chainId) {
 
     try {
         const { ethers } = await import('ethers');
-        const provider = new ethers.JsonRpcProvider(chain.rpcUrl, id, {
-            staticNetwork: true,
-            batchMaxCount: 1,  // Public RPCs often don't support batching
+
+        // Build a FetchRequest with the RPC URL
+        const fetchReq = new ethers.FetchRequest(chain.rpcUrl);
+        fetchReq.timeout = 15000; // 15s timeout
+
+        // Create a static Network with no ENS support
+        // This prevents the UNCONFIGURED_NAME error that happens when
+        // ethers tries to resolve contract addresses via ENS on public RPCs
+        const network = ethers.Network.from(id);
+
+        const provider = new ethers.JsonRpcProvider(fetchReq, network, {
+            staticNetwork: network,
+            batchMaxCount: 1,
         });
+
         providerCache.set(id, provider);
         return provider;
     } catch (e) {

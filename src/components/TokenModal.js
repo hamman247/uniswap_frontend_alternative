@@ -180,10 +180,15 @@ export class TokenModal {
     `;
 
     try {
-      const provider = walletConnect.provider || this._getFallbackProvider();
+      // Use wallet provider if available, otherwise fall back to public RPC
+      let provider = walletConnect.provider;
+      if (!provider) {
+        const { getPublicProvider } = await import('../utils/publicProvider.js');
+        provider = await getPublicProvider();
+      }
       if (!provider) {
         customResult.innerHTML = `
-          <div class="custom-token-error">Connect your wallet to import custom tokens</div>
+          <div class="custom-token-error">Unable to connect to network — please try again</div>
         `;
         this._isLookingUp = false;
         return;

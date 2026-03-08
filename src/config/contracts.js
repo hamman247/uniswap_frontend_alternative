@@ -84,9 +84,11 @@ export const UNISWAP_V3 = {
 export const UNISWAP_V4 = {
     get poolManager() { return getContracts().v4PoolManager; },
     get universalRouter() { return getContracts().v4UniversalRouter; },
+    get quoter() { return getContracts().v4Quoter; },
     feeTiers: FEE_TIERS,
     poolManagerAbi: ABIS.v4PoolManager,
     universalRouterAbi: ABIS.v4UniversalRouter,
+    quoterAbi: ABIS.v4Quoter,
 };
 
 export const MULTICALL3_ADDRESS = '0xcA11bde05977b3631167028862bE2a173976CA11';

@@ -19,7 +19,7 @@ export const CHAINS = {
         shortName: 'ETH',
         isTestnet: false,
         nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-        rpcUrl: 'https://eth.llamarpc.com',
+        rpcUrl: 'https://ethereum-rpc.publicnode.com',
         blockExplorer: 'https://etherscan.io',
         color: '#627eea',
         wethAddress: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
@@ -31,6 +31,7 @@ export const CHAINS = {
             v3QuoterV2: '0x61fFE014bA17989E743c5F6cB21bF9697530B21e',
             v4PoolManager: '0x000000000004444c5dc75cB358380D2e3dE08A90',
             v4UniversalRouter: '0x66a9893cc07d91d95644aedd05d03f95e1dba8af',
+            v4Quoter: '0x52f0e24d1c21c8a0cb1e5a5dd6198556bd9e1203',
         },
         gasConfig: { minTipWei: 1_000_000n, maxTipWei: 500_000_000n }, // 0.001–0.5 gwei
         versions: ['V2', 'V3', 'V4'],
@@ -42,7 +43,7 @@ export const CHAINS = {
         shortName: 'ARB',
         isTestnet: false,
         nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-        rpcUrl: 'https://arb1.arbitrum.io/rpc',
+        rpcUrl: 'https://arbitrum-one-rpc.publicnode.com',
         blockExplorer: 'https://arbiscan.io',
         color: '#28a0f0',
         wethAddress: '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1',
@@ -54,6 +55,7 @@ export const CHAINS = {
             v3QuoterV2: '0x61fFE014bA17989E743c5F6cB21bF9697530B21e',
             v4PoolManager: '0x000000000004444c5dc75cB358380D2e3dE08A90',
             v4UniversalRouter: '0xa51afafe0263b40edaef0df8781ea9aa03e381a3',
+            v4Quoter: '0x3972c00f7ed4885e145823eb7c655375d275a1c5',
         },
         gasConfig: { minTipWei: 100_000n, maxTipWei: 100_000_000n }, // 0.0001–0.1 gwei
         versions: ['V2', 'V3', 'V4'],
@@ -65,7 +67,7 @@ export const CHAINS = {
         shortName: 'OP',
         isTestnet: false,
         nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-        rpcUrl: 'https://mainnet.optimism.io',
+        rpcUrl: 'https://optimism-rpc.publicnode.com',
         blockExplorer: 'https://optimistic.etherscan.io',
         color: '#ff0420',
         wethAddress: '0x4200000000000000000000000000000000000006',
@@ -77,6 +79,7 @@ export const CHAINS = {
             v3QuoterV2: '0x61fFE014bA17989E743c5F6cB21bF9697530B21e',
             v4PoolManager: '0x000000000004444c5dc75cB358380D2e3dE08A90',
             v4UniversalRouter: '0x851116DCd5E74627B2C4e0141e1Bed1e9e5ed54e',
+            v4Quoter: '0x1f3131a13296fb91c90870043742c3cdbff1a8d7',
         },
         gasConfig: { minTipWei: 1_000n, maxTipWei: 50_000_000n }, // very low L2 tips
         versions: ['V2', 'V3', 'V4'],
@@ -88,7 +91,7 @@ export const CHAINS = {
         shortName: 'POL',
         isTestnet: false,
         nativeCurrency: { name: 'POL', symbol: 'POL', decimals: 18 },
-        rpcUrl: 'https://polygon-rpc.com',
+        rpcUrl: 'https://polygon-bor-rpc.publicnode.com',
         blockExplorer: 'https://polygonscan.com',
         color: '#8247e5',
         wethAddress: '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270', // WMATIC
@@ -100,6 +103,7 @@ export const CHAINS = {
             v3QuoterV2: '0x61fFE014bA17989E743c5F6cB21bF9697530B21e',
             v4PoolManager: '0x000000000004444c5dc75cB358380D2e3dE08A90',
             v4UniversalRouter: '0x1095692a6237d83c6a72f3F5eFeA8Fbc5F8e9547',
+            v4Quoter: '0xb3d5c3dfc3a7aebff71895a7191796bffc2c81b9',
         },
         gasConfig: { minTipWei: 1_000_000_000n, maxTipWei: 50_000_000_000n }, // 1–50 gwei (Polygon tips are higher)
         versions: ['V2', 'V3', 'V4'],
@@ -111,7 +115,7 @@ export const CHAINS = {
         shortName: 'BASE',
         isTestnet: false,
         nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-        rpcUrl: 'https://mainnet.base.org',
+        rpcUrl: 'https://base-rpc.publicnode.com',
         blockExplorer: 'https://basescan.org',
         color: '#0052ff',
         wethAddress: '0x4200000000000000000000000000000000000006',
@@ -123,6 +127,7 @@ export const CHAINS = {
             v3QuoterV2: '0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a',
             v4PoolManager: '0x000000000004444c5dc75cB358380D2e3dE08A90',
             v4UniversalRouter: '0x6fF5693b99212Da76ad316178A184AB56D299b43',
+            v4Quoter: '0x0d5e0f971ed27fbff6c2837bf31316121532048d',
         },
         gasConfig: { minTipWei: 1_000n, maxTipWei: 50_000_000n },
         versions: ['V2', 'V3', 'V4'],
@@ -134,7 +139,7 @@ export const CHAINS = {
         shortName: 'BSC',
         isTestnet: false,
         nativeCurrency: { name: 'BNB', symbol: 'BNB', decimals: 18 },
-        rpcUrl: 'https://bsc-dataseed1.binance.org',
+        rpcUrl: 'https://bsc-rpc.publicnode.com',
         blockExplorer: 'https://bscscan.com',
         color: '#f0b90b',
         wethAddress: '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c', // WBNB
@@ -157,7 +162,7 @@ export const CHAINS = {
         shortName: 'AVAX',
         isTestnet: false,
         nativeCurrency: { name: 'Avalanche', symbol: 'AVAX', decimals: 18 },
-        rpcUrl: 'https://api.avax.network/ext/bc/C/rpc',
+        rpcUrl: 'https://avalanche-c-chain-rpc.publicnode.com',
         blockExplorer: 'https://snowtrace.io',
         color: '#e84142',
         wethAddress: '0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7', // WAVAX
@@ -356,6 +361,9 @@ export const ABIS = {
     ],
     v4UniversalRouter: [
         'function execute(bytes calldata commands, bytes[] calldata inputs, uint256 deadline) payable',
+    ],
+    v4Quoter: [
+        'function quoteExactInputSingle(tuple(tuple(address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) poolKey, bool zeroForOne, uint128 exactAmount, uint160 sqrtPriceLimitX96, bytes hookData) params) returns (int128[] deltaAmounts, uint160 sqrtPriceX96After, uint32 initializedTicksCrossed)',
     ],
     erc20: [
         'function name() view returns (string)',

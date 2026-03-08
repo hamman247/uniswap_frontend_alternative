@@ -1,12 +1,17 @@
 /**
  * Route Executor — builds and submits transactions for the optimized route
- * Handles V2, V3, and V4 swap encoding and token approvals.
+ *
+ * All swap legs are bundled into a SINGLE transaction via the Universal Router.
+ * The Universal Router supports V2, V3, and V4 swaps in one execute() call.
+ *
+ * For chains without a Universal Router, falls back to the best available
+ * single-version router.
  *
  * Explicitly sets EIP-1559 gas parameters to avoid MetaMask's inflated
  * default priority fee (2 gwei). Fetches the real priority fee from
  * the network and uses that instead.
  */
-import { UNISWAP_V2, UNISWAP_V3, UNISWAP_V4, ERC20_ABI, getCurrentChainId, getGasConfig } from '../config/contracts.js';
+import { UNISWAP_V2, UNISWAP_V3, UNISWAP_V4, ERC20_ABI, getCurrentChainId, getGasConfig, getContracts, getWethAddress } from '../config/contracts.js';
 import { NATIVE_ETH, WETH_ADDRESS, getRoutingAddress, isWrapUnwrap } from '../config/tokens.js';
 import { feeManager } from '../fees/feeManager.js';
 
@@ -16,23 +21,30 @@ const WETH_ABI = [
     'function withdraw(uint256 wad)',
 ];
 
+// ─── Universal Router command IDs ───
+const UR_COMMANDS = {
+    V3_SWAP_EXACT_IN: 0x00,
+    V2_SWAP_EXACT_IN: 0x08,
+    WRAP_ETH: 0x0b,
+    UNWRAP_WETH: 0x0c,
+    V4_SWAP: 0x10,
+};
+
+// ─── V4 swap action IDs (from @uniswap/v4-sdk Actions enum) ───
+const V4_ACTIONS = {
+    SWAP_EXACT_IN_SINGLE: 0x06,
+    SETTLE_ALL: 0x0c,
+    TAKE_ALL: 0x0f,
+};
+
 /**
  * Build EIP-1559 gas overrides from live network data.
- *
- * Uses eth_feeHistory to sample the 25th-percentile priority fee
- * from the last 5 blocks — this reflects the actual minimum tip
- * getting included on-chain, rather than provider defaults.
- *
- * @param {import('ethers').Provider} provider
- * @returns {Promise<{ maxFeePerGas: bigint, maxPriorityFeePerGas: bigint }>}
  */
 async function buildGasOverrides(provider) {
     try {
-        // 1. Get the latest block's base fee
         const latestBlock = await provider.getBlock('latest');
         const baseFee = latestBlock?.baseFeePerGas || 10_000_000_000n;
 
-        // 2. Query fee history: last 5 blocks, 25th percentile reward
         let priorityFee;
         try {
             const feeHistory = await provider.send('eth_feeHistory', ['0x5', 'latest', [25]]);
@@ -41,35 +53,28 @@ async function buildGasOverrides(provider) {
                 .filter(r => r > 0n);
 
             if (rewards.length > 0) {
-                // Use the median of the 25th-percentile tips
                 rewards.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
                 priorityFee = rewards[Math.floor(rewards.length / 2)];
             }
         } catch {
-            // eth_feeHistory may not be supported by all providers
+            // eth_feeHistory may not be supported
         }
 
-        // 3. Fallback to provider's feeData if feeHistory didn't work
         if (!priorityFee) {
             const feeData = await provider.getFeeData();
             priorityFee = feeData.maxPriorityFeePerGas || 100_000_000n;
         }
 
-        // 4. Clamp using chain-specific gas bounds
         const { minTipWei, maxTipWei } = getGasConfig();
         priorityFee = priorityFee < minTipWei ? minTipWei : priorityFee > maxTipWei ? maxTipWei : priorityFee;
 
-        // 5. maxFeePerGas = baseFee × 1.125 + priorityFee (tight but safe)
         const maxFeePerGas = baseFee + baseFee / 8n + priorityFee;
 
         console.log(
             `Gas: baseFee=${Number(baseFee) / 1e9}gwei, tip=${Number(priorityFee) / 1e9}gwei, maxFee=${Number(maxFeePerGas) / 1e9}gwei`
         );
 
-        return {
-            maxFeePerGas,
-            maxPriorityFeePerGas: priorityFee,
-        };
+        return { maxFeePerGas, maxPriorityFeePerGas: priorityFee };
     } catch (e) {
         console.warn('Failed to fetch gas params, letting wallet decide:', e.message);
         return {};
@@ -78,13 +83,6 @@ async function buildGasOverrides(provider) {
 
 /**
  * Execute a native ↔ wrapped native wrap or unwrap.
- * Calls WETH.deposit() for wrapping or WETH.withdraw() for unwrapping.
- *
- * @param {import('ethers').Signer} signer
- * @param {bigint} amount — amount to wrap or unwrap
- * @param {boolean} isWrap — true = native→wrapped (deposit), false = wrapped→native (withdraw)
- * @param {string} wethAddress — the WETH contract address on this chain
- * @returns {Promise<import('ethers').TransactionResponse>}
  */
 export async function executeWrapUnwrap(signer, amount, isWrap, wethAddress) {
     const { ethers } = await import('ethers');
@@ -101,14 +99,15 @@ export async function executeWrapUnwrap(signer, amount, isWrap, wethAddress) {
 }
 
 /**
- * Execute the optimized route
+ * Execute the optimized route — bundles all legs into a single transaction.
+ *
  * @param {import('ethers').Signer} signer — connected wallet signer
  * @param {object} routeResult — from optimizer
  * @param {object} tokenIn
  * @param {object} tokenOut
- * @param {number} slippageBps — slippage tolerance in bps
+ * @param {number} slippageBps — slippage tolerance in bps (default 50 = 0.5%)
  * @param {number} deadlineMinutes — transaction deadline
- * @returns {Promise<import('ethers').TransactionResponse>}
+ * @returns {Promise<Array<import('ethers').TransactionResponse>>}
  */
 export async function executeRoute(signer, routeResult, tokenIn, tokenOut, slippageBps = 50, deadlineMinutes = 20) {
     const { ethers } = await import('ethers');
@@ -127,28 +126,309 @@ export async function executeRoute(signer, routeResult, tokenIn, tokenOut, slipp
     }
 
     const deadline = Math.floor(Date.now() / 1000) + deadlineMinutes * 60;
-
-    // Fetch live gas params once for all legs
     const gasOverrides = await buildGasOverrides(signer.provider);
+    const recipient = await signer.getAddress();
+    const contracts = getContracts(chainId);
+    const wethAddr = getWethAddress(chainId);
 
-    // For simplicity in a multi-route split, execute each leg as a separate tx
-    // In production, you'd batch these via Universal Router or a custom contract
+    // Determine the effective token addresses for routing
+    const effectiveTokenIn = tokenIn.isNative ? wethAddr : tokenIn.address;
+    const effectiveTokenOut = tokenOut.isNative ? wethAddr : tokenOut.address;
+
+    // ─── Try Universal Router batching first ───
+    const universalRouterAddr = contracts.v4UniversalRouter;
+    if (universalRouterAddr) {
+        return [await executeBatchedViaUniversalRouter(
+            ethers, signer, routeResult, tokenIn, tokenOut,
+            effectiveTokenIn, effectiveTokenOut, wethAddr,
+            universalRouterAddr, recipient, slippageBps, deadline, gasOverrides
+        )];
+    }
+
+    // ─── Fallback: use individual routers (for chains without Universal Router) ───
+    return executeLegacy(
+        ethers, signer, routeResult, tokenIn, tokenOut,
+        effectiveTokenIn, effectiveTokenOut, recipient, slippageBps, deadline, gasOverrides
+    );
+}
+
+/**
+ * Execute all route legs in a SINGLE transaction via the Universal Router.
+ *
+ * The Universal Router accepts:
+ *   execute(bytes commands, bytes[] inputs, uint256 deadline)
+ *
+ * Commands:
+ *   0x00 = V3_SWAP_EXACT_IN
+ *   0x08 = V2_SWAP_EXACT_IN
+ *   0x0b = WRAP_ETH (if input is native)
+ *   0x0c = UNWRAP_WETH (if output is native)
+ */
+async function executeBatchedViaUniversalRouter(
+    ethers, signer, routeResult, tokenIn, tokenOut,
+    effectiveTokenIn, effectiveTokenOut, wethAddr,
+    universalRouterAddr, recipient, slippageBps, deadline, gasOverrides
+) {
+    const abiCoder = ethers.AbiCoder.defaultAbiCoder();
+    const commands = [];
+    const inputs = [];
+    let totalEthValue = 0n;
+
+    const ZERO_ADDR = '0x0000000000000000000000000000000000000000';
+
+    // Check if any route uses V4 with native ETH (address(0))
+    const hasV4NativeRoute = routeResult.routes.some(r => {
+        const pool = r.pool.isMultiHop ? r.pool.leg1 : r.pool;
+        return pool.version === 'V4' &&
+            (pool.currency0?.toLowerCase() === ZERO_ADDR || pool.currency1?.toLowerCase() === ZERO_ADDR);
+    });
+
+    // If input is native ETH, handle differently for V4 vs V2/V3
+    if (tokenIn.isNative) {
+        totalEthValue = routeResult.totalAmountIn;
+        if (!hasV4NativeRoute) {
+            // V2/V3: wrap ETH to WETH first via the Universal Router
+            commands.push(UR_COMMANDS.WRAP_ETH);
+            inputs.push(abiCoder.encode(
+                ['address', 'uint256'],
+                [universalRouterAddr, routeResult.totalAmountAfterFee]
+            ));
+        }
+        // V4 native: no WRAP_ETH needed — PoolManager settles native ETH via msg.value
+    } else {
+        // ERC-20 input: ensure approval for the Universal Router
+        await ensureApproval(signer, tokenIn.address, universalRouterAddr, routeResult.totalAmountIn, gasOverrides);
+    }
+
+    // Encode each route leg as a Universal Router command
+    for (const route of routeResult.routes) {
+        const minAmountOut = route.amountOut - (route.amountOut * BigInt(slippageBps)) / 10000n;
+        const version = route.pool.isMultiHop
+            ? route.pool.leg1.version
+            : route.pool.version;
+
+        const payerIsUser = !tokenIn.isNative;
+        const swapRecipient = tokenOut.isNative ? universalRouterAddr : recipient;
+
+        if (version === 'V4') {
+            // V4 swap via V4_SWAP command — uses pool's actual currencies from PoolKey
+            const v4Input = encodeV4SwapCommand(
+                ethers, abiCoder, route, tokenIn, tokenOut,
+                minAmountOut, swapRecipient
+            );
+            commands.push(UR_COMMANDS.V4_SWAP);
+            inputs.push(v4Input);
+        } else if (version === 'V3' || route.pool.isMultiHop) {
+            const path = encodeV3Path(route, effectiveTokenIn, effectiveTokenOut, wethAddr);
+            commands.push(UR_COMMANDS.V3_SWAP_EXACT_IN);
+            inputs.push(abiCoder.encode(
+                ['address', 'uint256', 'uint256', 'bytes', 'bool'],
+                [swapRecipient, route.amountIn, minAmountOut, path, payerIsUser]
+            ));
+        } else if (version === 'V2') {
+            const path = [effectiveTokenIn, effectiveTokenOut];
+            commands.push(UR_COMMANDS.V2_SWAP_EXACT_IN);
+            inputs.push(abiCoder.encode(
+                ['address', 'uint256', 'uint256', 'address[]', 'bool'],
+                [swapRecipient, route.amountIn, minAmountOut, path, payerIsUser]
+            ));
+        }
+    }
+
+    // If output is native ETH, unwrap WETH at the end
+    if (tokenOut.isNative) {
+        const totalMinOut = routeResult.totalAmountOut
+            - (routeResult.totalAmountOut * BigInt(slippageBps)) / 10000n;
+        commands.push(UR_COMMANDS.UNWRAP_WETH);
+        inputs.push(abiCoder.encode(
+            ['address', 'uint256'],
+            [recipient, totalMinOut]
+        ));
+    }
+
+    // Build the commands bytes
+    const commandBytes = '0x' + commands.map(c => c.toString(16).padStart(2, '0')).join('');
+
+    console.log(`Executing ${commands.length} commands via Universal Router in a single transaction`);
+
+    const universalRouter = new ethers.Contract(
+        universalRouterAddr,
+        ['function execute(bytes calldata commands, bytes[] calldata inputs, uint256 deadline) payable'],
+        signer
+    );
+
+    return universalRouter.execute(
+        commandBytes,
+        inputs,
+        deadline,
+        {
+            value: totalEthValue,
+            ...gasOverrides,
+        }
+    );
+}
+
+/**
+ * Encode a V3-style path for the Universal Router.
+ * Format: tokenIn (20 bytes) + fee (3 bytes) + tokenOut (20 bytes)
+ * For multi-hop: tokenIn + fee1 + intermediary + fee2 + tokenOut
+ */
+function encodeV3Path(route, effectiveTokenIn, effectiveTokenOut, wethAddr) {
+    if (route.pool.isMultiHop) {
+        // Multi-hop: tokenIn → fee1 → intermediary → fee2 → tokenOut
+        const fee1 = route.pool.leg1.fee;
+        const fee2 = route.pool.leg2.fee;
+        const intermediary = route.pool.intermediary;
+
+        return ethers_encodePath(
+            [effectiveTokenIn, intermediary, effectiveTokenOut],
+            [fee1, fee2]
+        );
+    }
+
+    // Single hop
+    return ethers_encodePath(
+        [effectiveTokenIn, effectiveTokenOut],
+        [route.pool.fee]
+    );
+}
+
+/**
+ * Encode a V3 path as packed bytes: token (20) + fee (3) + token (20) + ...
+ */
+function ethers_encodePath(tokens, fees) {
+    if (tokens.length !== fees.length + 1) throw new Error('Invalid path lengths');
+
+    let path = '0x';
+    for (let i = 0; i < fees.length; i++) {
+        // Token address: 20 bytes (remove 0x prefix)
+        path += tokens[i].slice(2).toLowerCase().padStart(40, '0');
+        // Fee: 3 bytes
+        path += fees[i].toString(16).padStart(6, '0');
+    }
+    // Last token
+    path += tokens[tokens.length - 1].slice(2).toLowerCase().padStart(40, '0');
+
+    return path;
+}
+
+/**
+ * Encode a V4 swap command for the Universal Router.
+ *
+ * V4_SWAP (0x10) input format:
+ *   abi.encode(bytes actions, bytes[] params)
+ *
+ * Actions: SWAP_EXACT_IN_SINGLE (0x06) + SETTLE_ALL (0x09) + TAKE_ALL (0x12)
+ *
+ * IMPORTANT: V4 pools use their actual PoolKey currencies from the Initialize event.
+ * Native ETH pools use address(0) — not WETH. SETTLE_ALL/TAKE_ALL must use
+ * the same currency addresses as the PoolKey.
+ */
+function encodeV4SwapCommand(ethers, abiCoder, route, tokenIn, tokenOut, minAmountOut, recipient) {
+    const pool = route.pool;
+    const ZERO_ADDR = '0x0000000000000000000000000000000000000000';
+
+    // Use the pool's actual currencies from the discovered PoolKey
+    // These are already sorted (currency0 < currency1)
+    const currency0 = pool.currency0;
+    const currency1 = pool.currency1;
+    const tickSpacing = pool.tickSpacing || getTickSpacingForFee(pool.fee);
+    const hooks = pool.hooks || ZERO_ADDR;
+
+    // Determine swap direction: does the input token match currency0?
+    const isToken0In = pool.isToken0In !== undefined
+        ? pool.isToken0In
+        : (tokenIn.isNative
+            ? currency0.toLowerCase() === ZERO_ADDR
+            : tokenIn.address?.toLowerCase() === currency0.toLowerCase());
+
+    // Determine which currencies the user is settling/taking
+    const settleCurrency = isToken0In ? currency0 : currency1;
+    const takeCurrency = isToken0In ? currency1 : currency0;
+
+    console.log(`V4 swap: c0=${currency0.slice(0, 10)}... c1=${currency1.slice(0, 10)}... ` +
+        `settle=${settleCurrency.slice(0, 10)}... take=${takeCurrency.slice(0, 10)}... z41=${isToken0In}`);
+
+    // Build actions bytes: SWAP_EXACT_IN_SINGLE + SETTLE_ALL + TAKE_ALL
+    const actions = '0x'
+        + V4_ACTIONS.SWAP_EXACT_IN_SINGLE.toString(16).padStart(2, '0')
+        + V4_ACTIONS.SETTLE_ALL.toString(16).padStart(2, '0')
+        + V4_ACTIONS.TAKE_ALL.toString(16).padStart(2, '0');
+
+    // Encode SWAP_EXACT_IN_SINGLE params
+    const swapParam = abiCoder.encode(
+        [
+            'tuple(address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks)',
+            'bool',      // zeroForOne
+            'uint128',   // amountIn
+            'uint128',   // amountOutMinimum
+            'bytes',     // hookData
+        ],
+        [
+            {
+                currency0,
+                currency1,
+                fee: pool.fee,
+                tickSpacing,
+                hooks,
+            },
+            isToken0In,
+            route.amountIn,
+            minAmountOut,
+            '0x', // empty hook data
+        ]
+    );
+
+    // Encode SETTLE_ALL params (currency, maxAmount)
+    // For native ETH: use address(0); msg.value provides the ETH
+    const settleParam = abiCoder.encode(
+        ['address', 'uint256'],
+        [settleCurrency, route.amountIn]
+    );
+
+    // Encode TAKE_ALL params (currency, minAmount)
+    const takeParam = abiCoder.encode(
+        ['address', 'uint256'],
+        [takeCurrency, minAmountOut]
+    );
+
+    // Final V4_SWAP input: abi.encode(bytes actions, bytes[] params)
+    return abiCoder.encode(
+        ['bytes', 'bytes[]'],
+        [actions, [swapParam, settleParam, takeParam]]
+    );
+}
+
+/**
+ * Get tick spacing for a V4 fee tier
+ */
+function getTickSpacingForFee(fee) {
+    const map = { 100: 1, 500: 10, 3000: 60, 10000: 200 };
+    return map[fee] || 60;
+}
+
+/**
+ * Legacy execution: separate transactions per route leg.
+ * Used only as fallback for chains without a Universal Router.
+ */
+async function executeLegacy(
+    ethers, signer, routeResult, tokenIn, tokenOut,
+    effectiveTokenIn, effectiveTokenOut, recipient, slippageBps, deadline, gasOverrides
+) {
     const results = [];
 
     for (const route of routeResult.routes) {
-        // Calculate minimum output with slippage
         const minAmountOut = route.amountOut - (route.amountOut * BigInt(slippageBps)) / 10000n;
-
         let tx;
-        switch (route.pool.version) {
+
+        const version = route.pool.isMultiHop ? route.pool.leg1.version : route.pool.version;
+
+        switch (version) {
             case 'V2':
-                tx = await executeV2Swap(signer, route, tokenIn, tokenOut, minAmountOut, deadline, gasOverrides);
+                tx = await executeV2Swap(ethers, signer, route, tokenIn, tokenOut, effectiveTokenIn, effectiveTokenOut, minAmountOut, recipient, deadline, gasOverrides);
                 break;
             case 'V3':
-                tx = await executeV3Swap(signer, route, tokenIn, tokenOut, minAmountOut, deadline, gasOverrides);
-                break;
-            case 'V4':
-                tx = await executeV4Swap(signer, route, tokenIn, tokenOut, minAmountOut, deadline, gasOverrides);
+                tx = await executeV3Swap(ethers, signer, route, tokenIn, tokenOut, effectiveTokenIn, effectiveTokenOut, minAmountOut, recipient, deadline, gasOverrides);
                 break;
         }
 
@@ -159,62 +439,30 @@ export async function executeRoute(signer, routeResult, tokenIn, tokenOut, slipp
 }
 
 /**
- * Execute a V2 swap
+ * Legacy V2 swap (fallback)
  */
-async function executeV2Swap(signer, route, tokenIn, tokenOut, minAmountOut, deadline, gasOverrides) {
-    const { ethers } = await import('ethers');
+async function executeV2Swap(ethers, signer, route, tokenIn, tokenOut, effectiveTokenIn, effectiveTokenOut, minAmountOut, recipient, deadline, gasOverrides) {
     const router = new ethers.Contract(UNISWAP_V2.router, UNISWAP_V2.routerAbi, signer);
-    const recipient = await signer.getAddress();
+    const path = [effectiveTokenIn, effectiveTokenOut];
 
-    const path = [
-        tokenIn.isNative ? WETH_ADDRESS : tokenIn.address,
-        tokenOut.isNative ? WETH_ADDRESS : tokenOut.address,
-    ];
-
-    // Handle token approval for non-ETH input
     if (!tokenIn.isNative) {
         await ensureApproval(signer, tokenIn.address, UNISWAP_V2.router, route.amountIn, gasOverrides);
     }
 
     if (tokenIn.isNative) {
-        return router.swapExactETHForTokens(
-            minAmountOut,
-            path,
-            recipient,
-            deadline,
-            { value: route.amountIn, ...gasOverrides }
-        );
+        return router.swapExactETHForTokens(minAmountOut, path, recipient, deadline, { value: route.amountIn, ...gasOverrides });
     } else if (tokenOut.isNative) {
-        return router.swapExactTokensForETH(
-            route.amountIn,
-            minAmountOut,
-            path,
-            recipient,
-            deadline,
-            gasOverrides
-        );
+        return router.swapExactTokensForETH(route.amountIn, minAmountOut, path, recipient, deadline, gasOverrides);
     } else {
-        return router.swapExactTokensForTokens(
-            route.amountIn,
-            minAmountOut,
-            path,
-            recipient,
-            deadline,
-            gasOverrides
-        );
+        return router.swapExactTokensForTokens(route.amountIn, minAmountOut, path, recipient, deadline, gasOverrides);
     }
 }
 
 /**
- * Execute a V3 swap
+ * Legacy V3 swap (fallback)
  */
-async function executeV3Swap(signer, route, tokenIn, tokenOut, minAmountOut, deadline, gasOverrides) {
-    const { ethers } = await import('ethers');
+async function executeV3Swap(ethers, signer, route, tokenIn, tokenOut, effectiveTokenIn, effectiveTokenOut, minAmountOut, recipient, deadline, gasOverrides) {
     const router = new ethers.Contract(UNISWAP_V3.router, UNISWAP_V3.routerAbi, signer);
-    const recipient = await signer.getAddress();
-
-    const effectiveTokenIn = tokenIn.isNative ? WETH_ADDRESS : tokenIn.address;
-    const effectiveTokenOut = tokenOut.isNative ? WETH_ADDRESS : tokenOut.address;
 
     if (!tokenIn.isNative) {
         await ensureApproval(signer, tokenIn.address, UNISWAP_V3.router, route.amountIn, gasOverrides);
@@ -231,55 +479,8 @@ async function executeV3Swap(signer, route, tokenIn, tokenOut, minAmountOut, dea
         sqrtPriceLimitX96: 0n,
     };
 
-    const overrides = tokenIn.isNative
-        ? { value: route.amountIn, ...gasOverrides }
-        : { ...gasOverrides };
-
+    const overrides = tokenIn.isNative ? { value: route.amountIn, ...gasOverrides } : { ...gasOverrides };
     return router.exactInputSingle(params, overrides);
-}
-
-/**
- * Execute a V4 swap via Universal Router
- */
-async function executeV4Swap(signer, route, tokenIn, tokenOut, minAmountOut, deadline, gasOverrides) {
-    const { ethers } = await import('ethers');
-    const universalRouter = new ethers.Contract(
-        UNISWAP_V4.universalRouter,
-        UNISWAP_V4.universalRouterAbi,
-        signer
-    );
-
-    // V4_SWAP command = 0x10
-    const V4_SWAP = 0x10;
-
-    // Encode the V4 swap actions
-    const abiCoder = ethers.AbiCoder.defaultAbiCoder();
-
-    // Actions: SWAP_EXACT_IN_SINGLE (0x06), SETTLE_ALL (0x09), TAKE_ALL (0x12)
-    const actions = '0x060912';
-
-    // Encode swap params
-    const poolKey = {
-        currency0: route.pool.currency0 || tokenIn.address,
-        currency1: route.pool.currency1 || tokenOut.address,
-        fee: route.pool.fee,
-        tickSpacing: route.pool.tickSpacing || 60,
-        hooks: route.pool.hooks || '0x0000000000000000000000000000000000000000',
-    };
-
-    const commands = ethers.toBeHex(V4_SWAP);
-    const inputs = [
-        abiCoder.encode(
-            ['bytes', 'uint256'],
-            [actions, minAmountOut]
-        ),
-    ];
-
-    const overrides = tokenIn.isNative
-        ? { value: route.amountIn, ...gasOverrides }
-        : { ...gasOverrides };
-
-    return universalRouter.execute(commands, inputs, deadline, overrides);
 }
 
 /**
@@ -292,6 +493,7 @@ async function ensureApproval(signer, tokenAddress, spender, amount, gasOverride
 
     const currentAllowance = await token.allowance(owner, spender);
     if (currentAllowance < amount) {
+        console.log(`Approving ${spender} to spend tokens...`);
         const tx = await token.approve(spender, ethers.MaxUint256, gasOverrides);
         await tx.wait();
     }
@@ -303,7 +505,6 @@ async function ensureApproval(signer, tokenAddress, spender, amount, gasOverride
 export function getTransactionValue(routeResult, tokenIn) {
     if (!tokenIn.isNative) return 0n;
 
-    // Sum of all route amounts + fee
     let total = routeResult.feeAmount;
     for (const route of routeResult.routes) {
         total += route.amountIn;
