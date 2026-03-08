@@ -12,6 +12,11 @@ const { creditPoints, getLastBlock, setLastBlock } = require('./db');
 const TRACKING_TAG = '4f574c53574150'; // "OWLSWAP" in hex
 const UNIVERSAL_ROUTER = '0x66a9893cC07D91D95644AEDD05D03f95e1dBA8Af'.toLowerCase();
 
+// Bonus multiplier tokens — 2x points for trading WISE
+const BONUS_TOKENS = {
+    '0x66a0f676479cee1d7373f3dc2e2952778bff5bd6': 2, // WISE
+};
+
 // Known stablecoins (mainnet) — value = token amount / 10^decimals
 const STABLECOINS = {
     '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48': { symbol: 'USDC', decimals: 6 },
@@ -104,11 +109,21 @@ async function scanBlocks(provider, fromBlock, toBlock, chainId = 1) {
                     const volumeUsd = estimateVolumeUsd(receipt, tx, ethPrice);
                     if (volumeUsd < 0.01) continue; // skip dust
 
-                    const result = creditPoints(tx.from, tx.hash, blockNum, volumeUsd, chainId);
+                    // Check for bonus token multiplier (e.g., 2x for WISE)
+                    let multiplier = 1;
+                    for (const log of receipt.logs) {
+                        if (log.topics[0] === TRANSFER_SIG) {
+                            const bonus = BONUS_TOKENS[log.address.toLowerCase()];
+                            if (bonus && bonus > multiplier) multiplier = bonus;
+                        }
+                    }
+
+                    const result = creditPoints(tx.from, tx.hash, blockNum, volumeUsd * multiplier, chainId);
                     if (result.isNew) {
                         pointsCredited += result.points;
                         processedCount++;
-                        console.log(`  ✓ ${tx.hash.slice(0, 10)}... | ${tx.from.slice(0, 10)}... | $${volumeUsd.toFixed(2)} | +${result.points.toFixed(0)} pts`);
+                        const bonusTag = multiplier > 1 ? ` (${multiplier}x bonus)` : '';
+                        console.log(`  ✓ ${tx.hash.slice(0, 10)}... | ${tx.from.slice(0, 10)}... | $${volumeUsd.toFixed(2)}${bonusTag} | +${result.points.toFixed(0)} pts`);
                     }
                 } catch (e) {
                     console.warn(`  ✗ Error processing ${tx.hash.slice(0, 10)}...`, e.message);

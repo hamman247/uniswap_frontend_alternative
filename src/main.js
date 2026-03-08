@@ -11,8 +11,6 @@ import { SwapCard } from './components/SwapCard.js';
 import { TokenModal } from './components/TokenModal.js';
 import { Settings } from './components/Settings.js';
 import { RouteVisualizer } from './components/RouteVisualizer.js';
-import { PointsDisplay } from './components/PointsDisplay.js';
-import { Leaderboard } from './components/Leaderboard.js';
 import { walletConnect } from './components/WalletConnect.js';
 import { executeRoute } from './routing/executor.js';
 import { fetchAllBalances, clearBalanceCache } from './utils/balances.js';
@@ -28,9 +26,6 @@ class App {
         this.tokenModal = null;
         this.settings = null;
         this.routeVisualizer = null;
-        this.pointsDisplay = null;
-        this.leaderboard = null;
-        this.currentPage = 'swap'; // 'swap' or 'leaderboard'
         this.mainContainer = null;
         this.swapContent = null;
         this.tokenSelectSide = null; // 'in' or 'out'
@@ -46,15 +41,8 @@ class App {
         this.header = new Header({
             onConnectWallet: () => this._connectWallet(),
             onChainSelect: (chainId) => this._switchChain(chainId),
-            onNavSwap: () => this._showPage('swap'),
-            onNavLeaderboard: () => this._showPage('leaderboard'),
         });
         app.appendChild(this.header.render());
-
-        // ─── Points Display (in header) ───
-        this.pointsDisplay = new PointsDisplay();
-        const pointsContainer = this.header.element.querySelector('#points-container');
-        if (pointsContainer) pointsContainer.appendChild(this.pointsDisplay.render());
 
         // ─── Main Container ───
         const main = document.createElement('main');
@@ -140,7 +128,6 @@ class App {
         // ─── Wallet state listener ───
         walletConnect.onChange(async (state) => {
             this.header.updateWallet(state.address);
-            this.pointsDisplay.setAddress(state.address);
             if (state.connected) {
                 // Detect the wallet's chain
                 const chainId = await this._detectWalletChain();
@@ -305,8 +292,6 @@ class App {
             );
 
             this._showNotification('success', `✅ Swap submitted! ${txResults.length} transaction(s)`);
-            // Refresh points after successful swap
-            setTimeout(() => this.pointsDisplay.refresh(), 5000);
         } catch (error) {
             console.error('Swap execution error:', error);
             const msg = error.reason || error.message || 'Transaction failed';
@@ -314,31 +299,7 @@ class App {
         }
     }
 
-    _showPage(page) {
-        this.currentPage = page;
-        const main = this.mainContainer;
-        if (!main) return;
 
-        if (page === 'leaderboard') {
-            // Hide swap content, show leaderboard
-            if (this.swapContent.parentNode === main) main.removeChild(this.swapContent);
-            if (this.leaderboard) this.leaderboard.destroy();
-            this.leaderboard = new Leaderboard({
-                onBack: () => {
-                    this._showPage('swap');
-                    this.header._setActiveNav('nav-swap');
-                },
-            });
-            main.appendChild(this.leaderboard.render());
-        } else {
-            // Show swap content, remove leaderboard
-            if (this.leaderboard) {
-                this.leaderboard.destroy();
-                this.leaderboard = null;
-            }
-            if (this.swapContent.parentNode !== main) main.appendChild(this.swapContent);
-        }
-    }
 
     _showNotification(type, message) {
         document.querySelectorAll('.notification').forEach(n => n.remove());
