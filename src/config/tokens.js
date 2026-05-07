@@ -223,6 +223,8 @@ function getWethForChain(chainId) {
         7777777: '0x4200000000000000000000000000000000000006',
         480: '0x4200000000000000000000000000000000000006',
         369: '0xA1077a294dDE1B09bB078844df40758a5D0f9a27', // WPLS
+        250: '0x21be370D5312f44cB42ce377BC9b8a0cEF1A4C83', // WFTM
+        146: '0x039e2fB66102314Ce7b64Ce5Ce3E5183bc94aD38', // wS
         11155111: '0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14',
     };
     return wethMap[chainId] || WETH_ADDRESS;
@@ -378,6 +380,24 @@ export const CHAIN_TOKENS = {
         T('PLSX', 'PulseX', '0x95B303987A60C71504D99Aa1b13B4DA07b0790ab', 18, '#ff007a', 'ethereum'),
         T('HEX', 'HEX', '0x2b591e99afE9f32eAA6214f7B7629768c40Eeb39', 8, '#ff3366', 'ethereum'),
         T('INC', 'Incentive', '0x2fa878Ab3F87CC1C9737Fc071108F904c0B0C95d', 18, '#9b59b6', 'ethereum'),
+    ],
+
+    250: [ // Fantom — SpookySwap
+        { symbol: 'FTM', name: 'Fantom', address: NATIVE_ETH, decimals: 18, isNative: true, color: '#1969ff', logo: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/fantom/info/logo.png', popular: true },
+        T('USDC', 'USD Coin', '0x04068DA6C83AFCFA0e13ba15A6696662335D5B75', 6, '#2775ca', 'fantom'),
+        T('fUSDT', 'Tether USD', '0x049d68029688eAbF473097a2fC38ef61633A3C7A', 6, '#26a17b', 'fantom'),
+        T('DAI', 'Dai', '0x8D11eC38a3EB5E956B052f67Da8Bdc9bef8Abf3E', 18, '#f5ac37', 'fantom'),
+        T('WFTM', 'Wrapped Fantom', '0x21be370D5312f44cB42ce377BC9b8a0cEF1A4C83', 18, '#1969ff', 'fantom'),
+        T('BOO', 'SpookyToken', '0x841FAD6EAe12c286d1Fd18d1d525DFfA75C7EFFE', 18, '#6b4eff', 'fantom'),
+        T('WBTC', 'Wrapped BTC', '0x321162Cd933E2Be498Cd2267a90534A804051b11', 8, '#f09242', 'fantom'),
+        T('WETH', 'Wrapped ETH', '0x74b23882a30290451A17c44f4F05243b6b58C76d', 18, '#627eea', 'fantom'),
+    ],
+
+    146: [ // Sonic — SpookySwap
+        { symbol: 'S', name: 'Sonic', address: NATIVE_ETH, decimals: 18, isNative: true, color: '#00d4aa', logo: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/sonic/info/logo.png', popular: true },
+        T('USDC', 'USD Coin', '0x29219dd400f2Bf60E5a23d13Be72B486D4038894', 6, '#2775ca', 'sonic'),
+        T('wS', 'Wrapped Sonic', '0x039e2fB66102314Ce7b64Ce5Ce3E5183bc94aD38', 18, '#00d4aa', 'sonic'),
+        T('WETH', 'Wrapped ETH', '0x50c42dEAcD8Fc9773493ED674b675bE577f2634b', 18, '#627eea', 'sonic'),
     ],
 
     11155111: [ // Sepolia testnet

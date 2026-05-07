@@ -240,6 +240,8 @@ export class SwapCard {
         56: BigInt(5e15),     // 0.005 BNB
         43114: BigInt(5e16),  // 0.05 AVAX
         369: BigInt(5e17),    // 0.5 PLS
+        250: BigInt(5e17),    // 0.5 FTM
+        146: BigInt(5e17),    // 0.5 S
       };
       const gasBuffer = gasBuffers[chainId] || BigInt(5e15);
       raw = raw > gasBuffer ? raw - gasBuffer : 0n;
@@ -289,16 +291,23 @@ export class SwapCard {
   /**
    * Update displayed balances from the cache
    */
-  updateBalances() {
-    if (this.tokenIn) {
-      const balIn = getCachedBalance(this.tokenIn.address);
-      const el = this.element.querySelector('#balance-in');
-      el.textContent = balIn ? `${t('balance')}: ${balIn.formatted}` : `${t('balance')}: —`;
-    }
-    if (this.tokenOut) {
-      const balOut = getCachedBalance(this.tokenOut.address);
-      const el = this.element.querySelector('#balance-out');
-      el.textContent = balOut ? `${t('balance')}: ${balOut.formatted}` : `${t('balance')}: —`;
+  async updateBalances() {
+    const { walletConnect } = await import('./WalletConnect.js');
+    const provider = walletConnect?.provider;
+    const address = walletConnect?.address;
+
+    for (const [side, token] of [['in', this.tokenIn], ['out', this.tokenOut]]) {
+      if (!token) continue;
+      let bal = getCachedBalance(token.address);
+
+      // If balance is not cached and we have a provider, fetch it now (custom token)
+      if (!bal && provider && address) {
+        const { fetchTokenBalance } = await import('../utils/balances.js');
+        bal = await fetchTokenBalance(provider, address, token);
+      }
+
+      const el = this.element.querySelector(`#balance-${side}`);
+      el.textContent = bal ? `${t('balance')}: ${bal.formatted}` : `${t('balance')}: —`;
     }
   }
 

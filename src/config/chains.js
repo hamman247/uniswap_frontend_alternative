@@ -294,6 +294,52 @@ export const CHAINS = {
         versions: ['V3'],
     },
 
+    250: {
+        chainId: 250,
+        name: 'Fantom',
+        shortName: 'FTM',
+        isTestnet: false,
+        nativeCurrency: { name: 'Fantom', symbol: 'FTM', decimals: 18 },
+        rpcUrl: 'https://rpc.ankr.com/fantom',
+        blockExplorer: 'https://ftmscan.com',
+        color: '#1969ff',
+        wethAddress: '0x21be370D5312f44cB42ce377BC9b8a0cEF1A4C83', // WFTM
+        contracts: {
+            v2Factory: '0x152eE697f2E276fA89E96742e9bB9aB1F2E61bE3', // SpookySwap V2
+            v2Router: '0xF491e7B69E4244ad4002BC14e878a34207E38c29',  // SpookySwap V2
+            v3Factory: null,
+            v3Router: null,
+            v3QuoterV2: null,
+            v4PoolManager: null,
+            v4UniversalRouter: null,
+        },
+        gasConfig: { minTipWei: 1_000_000_000n, maxTipWei: 100_000_000_000n }, // 1–100 gwei
+        versions: ['V2'],
+    },
+
+    146: {
+        chainId: 146,
+        name: 'Sonic',
+        shortName: 'S',
+        isTestnet: false,
+        nativeCurrency: { name: 'Sonic', symbol: 'S', decimals: 18 },
+        rpcUrl: 'https://rpc.soniclabs.com',
+        blockExplorer: 'https://sonicscan.org',
+        color: '#00d4aa',
+        wethAddress: '0x039e2fB66102314Ce7b64Ce5Ce3E5183bc94aD38', // wS
+        contracts: {
+            v2Factory: '0xEE4bC42157cf65291Ba2FE839AE127e3Cc76f741', // SpookySwap V2
+            v2Router: '0xa6AD18C2aC47803E193F75c3677b14BF19B94883',  // SpookySwap V2
+            v3Factory: '0x3D91B700252e0E3eE7805d12e048a988Ab69C8ad', // SpookySwap V3
+            v3Router: '0x0C2BC01d435CfEb2DC6Ad7cEC0E473e2DBaBdd87',  // SpookySwap V3
+            v3QuoterV2: '0x3F2026Cae76b987C4002e62B9dF70988b4388234', // SpookySwap V3
+            v4PoolManager: null,
+            v4UniversalRouter: null,
+        },
+        gasConfig: { minTipWei: 1_000_000_000n, maxTipWei: 100_000_000_000n }, // 1–100 gwei
+        versions: ['V2', 'V3'],
+    },
+
     369: {
         chainId: 369,
         name: 'PulseChain',

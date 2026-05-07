@@ -87,6 +87,8 @@ export class Header {
       7777777: 'https://icons.llamao.fi/icons/chains/rsz_zora.jpg',
       480: 'https://icons.llamao.fi/icons/chains/rsz_worldchain.jpg',
       369: 'https://tokens.app.pulsex.com/images/tokens/0xA1077a294dDE1B09bB078844df40758a5D0f9a27.png',
+      250: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/fantom/info/logo.png',
+      146: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/sonic/info/logo.png',
       11155111: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/info/logo.png',
     };
     return logos[chain.chainId] || '';
