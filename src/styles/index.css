@@ -1706,6 +1706,17 @@ body::before {
 }
 
 /* ---------- Ad Banners ---------- */
+.tagline-banner {
+  text-align: center;
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-3);
+  font-size: var(--font-sm);
+  font-weight: 500;
+  color: var(--text-secondary);
+  letter-spacing: 0.02em;
+  opacity: 0.85;
+}
+
 .ad-banner {
   display: flex;
   align-items: center;

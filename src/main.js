@@ -79,6 +79,11 @@ class App {
             },
         });
 
+        // ─── Tagline ───
+        const tagline = document.createElement('div');
+        tagline.className = 'tagline-banner';
+        tagline.textContent = 'Community built swap with zero interface fees.';
+        this.swapContent.appendChild(tagline);
 
         // Wrap swap card with relative positioning for settings overlay
         const swapWrapper = document.createElement('div');
