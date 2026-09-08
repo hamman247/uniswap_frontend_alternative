@@ -22,7 +22,7 @@ export class Header {
     header.className = 'header';
     header.innerHTML = `
       <a class="header-logo" href="/">
-        <img src="/owl-logo.jpg" alt="WiseSwap" class="header-logo-img" />
+        <img src="/owl-logo.png" alt="WiseSwap" class="header-logo-img" />
         <span class="header-logo-text">WiseSwap</span>
       </a>
 
