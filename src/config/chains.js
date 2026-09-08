@@ -294,6 +294,29 @@ export const CHAINS = {
         versions: ['V3'],
     },
 
+    4663: {
+        chainId: 4663,
+        name: 'Robinhood',
+        shortName: 'RH',
+        isTestnet: false,
+        nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+        rpcUrl: 'https://rpc.mainnet.chain.robinhood.com',
+        blockExplorer: 'https://robinhoodchain.blockscout.com',
+        color: '#00c805',
+        wethAddress: '0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73', // WETH
+        contracts: {
+            v2Factory: null,
+            v2Router: null,
+            v3Factory: '0x1f7d7550b1b028f7571e69a784071f0205fd2efa',
+            v3Router: '0xcaf681a66d020601342297493863e78c959e5cb2', // SwapRouter02
+            v3QuoterV2: '0x33e885ed0ec9bf04ecfb19341582aadcb4c8a9e7',
+            v4PoolManager: null,
+            v4UniversalRouter: '0x8876789976decbfcbbbe364623c63652db8c0904',
+        },
+        gasConfig: { minTipWei: 1_000n, maxTipWei: 50_000_000n },
+        versions: ['V3'],
+    },
+
     250: {
         chainId: 250,
         name: 'Fantom',

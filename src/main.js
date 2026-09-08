@@ -79,12 +79,6 @@ class App {
             },
         });
 
-        // ─── Ad Banner: Top ───
-        const adTop = document.createElement('div');
-        adTop.className = 'ad-banner ad-banner-top';
-        adTop.id = 'ad-slot-top';
-        adTop.innerHTML = `<div id="frame" style="width: 100%;margin: auto;position: relative; z-index: 99998;"><iframe data-aa='2429840' src='//acceptable.a-ads.com/2429840/?size=Adaptive' style='border:0; padding:0; width:70%; height:auto; overflow:hidden;display: block;margin: auto'></iframe></div>`;
-        this.swapContent.appendChild(adTop);
 
         // Wrap swap card with relative positioning for settings overlay
         const swapWrapper = document.createElement('div');

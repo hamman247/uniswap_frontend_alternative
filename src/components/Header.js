@@ -26,10 +26,6 @@ export class Header {
         <span class="header-logo-text">WiseSwap</span>
       </a>
 
-      <nav class="header-nav">
-        <button class="header-nav-item active" id="nav-swap">${t('swap')}</button>
-        <a class="header-nav-item" href="https://app.uniswap.org/positions/create?currencyA=NATIVE&currencyB=0x66a0f676479Cee1d7373f3DC2e2952778BfF5bd6&chain=ethereum&fee={%22isDynamic%22:false,%22feeAmount%22:100,%22tickSpacing%22:1}&hook=undefined&priceRangeState={%22priceInverted%22:false,%22fullRange%22:false,%22initialPrice%22:%22%22,%22inputMode%22:%22price%22}&depositState={%22exactField%22:%22TOKEN0%22,%22exactAmounts%22:{}}&step=0" target="_blank" rel="noopener noreferrer">${t('pools')}</a>
-      </nav>
 
       <div class="header-actions">
         <div class="chain-selector" id="chain-selector">
@@ -89,6 +85,7 @@ export class Header {
       369: 'https://tokens.app.pulsex.com/images/tokens/0xA1077a294dDE1B09bB078844df40758a5D0f9a27.png',
       250: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/fantom/info/logo.png',
       146: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/sonic/info/logo.png',
+      4663: 'https://icons.llamao.fi/icons/chains/rsz_robinhood.jpg',
       11155111: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/info/logo.png',
     };
     return logos[chain.chainId] || '';
@@ -98,18 +95,6 @@ export class Header {
     // Wallet connect
     this.element.querySelector('#wallet-connect-btn').addEventListener('click', () => {
       if (this.onConnectWallet) this.onConnectWallet();
-    });
-
-    // Nav: Swap
-    this.element.querySelector('#nav-swap')?.addEventListener('click', () => {
-      this._setActiveNav('nav-swap');
-      this.onNavSwap?.();
-    });
-
-    // Nav: Leaderboard
-    this.element.querySelector('#nav-leaderboard')?.addEventListener('click', () => {
-      this._setActiveNav('nav-leaderboard');
-      this.onNavLeaderboard?.();
     });
 
     // Chain selector toggle

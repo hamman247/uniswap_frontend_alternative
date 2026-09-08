@@ -225,6 +225,7 @@ function getWethForChain(chainId) {
         369: '0xA1077a294dDE1B09bB078844df40758a5D0f9a27', // WPLS
         250: '0x21be370D5312f44cB42ce377BC9b8a0cEF1A4C83', // WFTM
         146: '0x039e2fB66102314Ce7b64Ce5Ce3E5183bc94aD38', // wS
+        4663: '0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73', // WETH (Robinhood)
         11155111: '0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14',
     };
     return wethMap[chainId] || WETH_ADDRESS;
@@ -398,6 +399,11 @@ export const CHAIN_TOKENS = {
         T('USDC', 'USD Coin', '0x29219dd400f2Bf60E5a23d13Be72B486D4038894', 6, '#2775ca', 'sonic'),
         T('wS', 'Wrapped Sonic', '0x039e2fB66102314Ce7b64Ce5Ce3E5183bc94aD38', 18, '#00d4aa', 'sonic'),
         T('WETH', 'Wrapped ETH', '0x50c42dEAcD8Fc9773493ED674b675bE577f2634b', 18, '#627eea', 'sonic'),
+    ],
+
+    4663: [ // Robinhood Chain
+        N('ETH', 'Ether', 18, '#627eea'),
+        T('WETH', 'Wrapped Ether', '0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73', 18, '#627eea', 'ethereum'),
     ],
 
     11155111: [ // Sepolia testnet
