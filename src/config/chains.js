@@ -483,6 +483,11 @@ export function getChain(chainId) {
 }
 
 /**
+ * Primary chain IDs — always visible regardless of test mode
+ */
+const PRIMARY_CHAIN_IDS = new Set([1, 8453, 4663, 42161]);
+
+/**
  * Get all mainnet chains
  */
 export function getMainnets() {
@@ -497,10 +502,47 @@ export function getTestnets() {
 }
 
 /**
- * Get visible chains based on testnet toggle
+ * Check if test mode is active.
+ * Reads from: URL param ?testmode=true → cookie wiseswap_testmode → false
+ */
+export function isTestMode() {
+    // 1. URL query parameter takes priority
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('testmode') === 'true') {
+        // Persist to cookie so user doesn't need the param again
+        setTestModeCookie(true);
+        return true;
+    }
+    // 2. Check cookie
+    return getTestModeCookie();
+}
+
+/**
+ * Set the test mode cookie (expires in 365 days)
+ */
+export function setTestModeCookie(enabled) {
+    const maxAge = enabled ? 365 * 24 * 60 * 60 : 0; // 1 year or expire immediately
+    document.cookie = `wiseswap_testmode=${enabled ? 'true' : 'false'}; path=/; max-age=${maxAge}; SameSite=Lax`;
+}
+
+/**
+ * Read the test mode cookie
+ */
+function getTestModeCookie() {
+    const match = document.cookie.match(/(?:^|;\s*)wiseswap_testmode=([^;]*)/);
+    return match ? match[1] === 'true' : false;
+}
+
+/**
+ * Get visible chains based on test mode.
+ * Primary chains are always shown; others require test mode.
  */
 export function getVisibleChains(showTestnets = false) {
-    return showTestnets ? Object.values(CHAINS) : getMainnets();
+    const testMode = showTestnets || isTestMode();
+    if (testMode) {
+        return Object.values(CHAINS);
+    }
+    return Object.values(CHAINS).filter(c => PRIMARY_CHAIN_IDS.has(c.chainId));
 }
 
 /**

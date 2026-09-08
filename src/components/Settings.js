@@ -3,6 +3,7 @@
  */
 import { ICONS } from './icons.js';
 import { t } from '../i18n/i18n.js';
+import { isTestMode, setTestModeCookie } from '../config/chains.js';
 
 const DEFAULT_SLIPPAGE = 0.5;
 const DEFAULT_DEADLINE = 20;
@@ -13,7 +14,7 @@ export class Settings {
     this.slippage = DEFAULT_SLIPPAGE;
     this.deadline = DEFAULT_DEADLINE;
     this.expertMode = false;
-    this.showTestnets = localStorage.getItem('wiseswap_testnets') === 'true';
+    this.showTestnets = isTestMode();
     this.element = null;
   }
 
@@ -104,7 +105,7 @@ export class Settings {
     // Testnet toggle
     this.element.querySelector('#testnet-toggle').addEventListener('change', (e) => {
       this.showTestnets = e.target.checked;
-      localStorage.setItem('wiseswap_testnets', String(this.showTestnets));
+      setTestModeCookie(this.showTestnets);
       this._emitUpdate();
     });
   }

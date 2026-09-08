@@ -1,7 +1,7 @@
 /**
  * Header Component — Logo, navigation, chain selector, and wallet
  */
-import { getVisibleChains, getChain, CHAINS } from '../config/chains.js';
+import { getVisibleChains, getChain, CHAINS, isTestMode } from '../config/chains.js';
 import { t } from '../i18n/i18n.js';
 
 export class Header {
@@ -12,7 +12,7 @@ export class Header {
     this.onNavLeaderboard = onNavLeaderboard;
     this.walletAddress = null;
     this.currentChainId = 1;
-    this.showTestnets = localStorage.getItem('wiseswap_testnets') === 'true';
+    this.showTestnets = isTestMode();
     this.chainDropdownOpen = false;
     this.element = null;
   }
