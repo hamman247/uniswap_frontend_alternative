@@ -260,12 +260,6 @@ async function executeBatchedViaUniversalRouter(
     // Build the commands bytes
     const commandBytes = '0x' + commands.map(c => c.toString(16).padStart(2, '0')).join('');
 
-    // ─── Tracking: encode "OW" tag (0x4F57) in the lower 16 bits of deadline ───
-    // The deadline just needs to be in the future. We round it up to the
-    // nearest 0x10000 (65,536 seconds ≈ 18 hours) and OR with our tag.
-    // Max deadline increase: ~18 hours. Scanner checks: deadline & 0xFFFF === 0x4F57.
-    const taggedDeadline = (Math.ceil(deadline / 0x10000) * 0x10000) | 0x4F57;
-
     console.log(`Executing ${commands.length} commands via Universal Router:`);
     console.log('  Commands:', commandBytes);
     console.log('  Deadline:', deadline);
@@ -276,7 +270,7 @@ async function executeBatchedViaUniversalRouter(
     const iface = new ethers.Interface([
         'function execute(bytes calldata commands, bytes[] calldata inputs, uint256 deadline) payable'
     ]);
-    const calldata = iface.encodeFunctionData('execute', [commandBytes, inputs, taggedDeadline]);
+    const calldata = iface.encodeFunctionData('execute', [commandBytes, inputs, deadline]);
 
     return signer.sendTransaction({
         to: universalRouterAddr,
