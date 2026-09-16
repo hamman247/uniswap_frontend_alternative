@@ -5,6 +5,21 @@
  * Provides backwards-compatible access for modules that import from here.
  */
 import { CHAINS, ABIS, getChain, FEE_TIERS } from './chains.js';
+import { getAddress } from 'ethers';
+
+// ─── Address normalization ─────────────────────────────────────
+// Converts any hex address to its proper EIP-55 checksum form.
+// This guards against bad checksums in config — ethers.js v6
+// rejects mixed-case addresses that don't match EIP-55.
+
+export function toChecksumAddress(addr) {
+    if (!addr) return addr;
+    try {
+        return getAddress(addr);
+    } catch {
+        return addr;
+    }
+}
 
 // ─── Fee Configuration ─────────────────────────────────────────
 export const FEE_CONFIG = {
@@ -32,19 +47,25 @@ export function getCurrentChain() {
 }
 
 /**
- * Get contract addresses for a specific chain
+ * Get contract addresses for a specific chain (checksummed)
  */
 export function getContracts(chainId = _currentChainId) {
     const chain = getChain(chainId);
-    return chain ? chain.contracts : null;
+    if (!chain) return null;
+    const raw = chain.contracts;
+    const checksummed = {};
+    for (const [key, value] of Object.entries(raw)) {
+        checksummed[key] = toChecksumAddress(value);
+    }
+    return checksummed;
 }
 
 /**
- * Get WETH (or wrapped native) address for the current chain
+ * Get WETH (or wrapped native) address for the current chain (checksummed)
  */
 export function getWethAddress(chainId = _currentChainId) {
     const chain = getChain(chainId);
-    return chain ? chain.wethAddress : '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2';
+    return toChecksumAddress(chain ? chain.wethAddress : '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2');
 }
 
 /**

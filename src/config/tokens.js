@@ -4,6 +4,8 @@
  * All tokens include logo URLs from TrustWallet assets CDN
  */
 
+import { toChecksumAddress } from './contracts.js';
+
 export const WETH_ADDRESS = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2';
 export const NATIVE_ETH = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
 
@@ -196,13 +198,13 @@ export function getTokenByAddress(address) {
 }
 
 /**
- * Get the effective address for routing (native → wrapped)
+ * Get the effective address for routing (native → wrapped, checksummed)
  */
 export function getRoutingAddress(token, chainId = 1) {
     if (token.isNative) {
         return getWethForChain(chainId);
     }
-    return token.address;
+    return toChecksumAddress(token.address);
 }
 
 /**
@@ -228,7 +230,7 @@ function getWethForChain(chainId) {
         4663: '0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73', // WETH (Robinhood)
         11155111: '0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14',
     };
-    return wethMap[chainId] || WETH_ADDRESS;
+    return toChecksumAddress(wethMap[chainId] || WETH_ADDRESS);
 }
 
 /**
@@ -292,7 +294,7 @@ export const CHAIN_TOKENS = {
         N('ETH', 'Ether', 18, '#627eea'),
         T('USDC', 'USD Coin', '0xaf88d065e77c8cC2239327C5EDb3A432268e5831', 6, '#2775ca', 'arbitrum'),
         T('USDT', 'Tether USD', '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9', 6, '#26a17b', 'arbitrum'),
-        T('WBTC', 'Wrapped BTC', '0x2f2a2543B76A4166549F7aaB2e75Bef0aeFc5B0f', 8, '#f09242', 'arbitrum'),
+        T('WBTC', 'Wrapped BTC', '0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f', 8, '#f09242', 'arbitrum'),
         T('ARB', 'Arbitrum', '0x912CE59144191C1204E64559FE8253a0e49E6548', 18, '#28a0f0', 'arbitrum'),
         T('UNI', 'Uniswap', '0xFa7F8980b0f1E64A2062791cc3b0871572f1F7f0', 18, '#ff007a', 'arbitrum'),
         T('LINK', 'Chainlink', '0xf97f4df75117a78c1A5a0DBb814Af92458539FB4', 18, '#2a5ada', 'arbitrum'),
